@@ -1,0 +1,9 @@
+{
+	"/": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/[slug]": [
+		"src/routes/+layout.ts"
+	]
+}
