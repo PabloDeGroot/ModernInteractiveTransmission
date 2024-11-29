@@ -3,11 +3,8 @@
     import { SignedOut } from "sveltefire";
     import {
         GoogleAuthProvider,
-        signInWithRedirect,
         signInWithPopup,
     } from "firebase/auth";
-    import { auth } from "$lib/firebase";
-
     const provider = new GoogleAuthProvider();
 </script>
 
