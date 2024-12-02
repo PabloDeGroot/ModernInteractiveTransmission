@@ -10,6 +10,7 @@
         RemoveUser,
     } from "$lib/firestrore/Room";
     import { deleteDoc, setDoc } from "firebase/firestore";
+    import type { MediaConnection } from "peerjs";
     interface RoomProps {
         firebaseUser: User;
         roomId: string;
@@ -65,7 +66,7 @@
     });
     // CALL USERS
     callUsers = (media: MediaStream) => {
-        let calls =[];
+        let calls =[] as MediaConnection[];
         users.forEach((u) => {
             if (peer == null || user == null) return;
             if (u.peerId !== user.peerId) {
@@ -80,7 +81,7 @@
         media.getVideoTracks()[0].onended = () => {
             console.log("Stream ended");
             calls.forEach(c => c.close());
-            
+
            
         };
     };
