@@ -11,11 +11,12 @@
 <main>
 
         <SignedOut let:auth>
+            
             <button on:click={() => signInWithPopup(auth, provider)}
                 >logIn</button
             >
         </SignedOut>
-        <SignedIn let:auth let:signOut>
+        <SignedIn let:auth let:signOut let:user>
             <button on:click={() => signOut()}>logOut</button>
         </SignedIn>
 </main>
