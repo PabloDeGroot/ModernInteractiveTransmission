@@ -1,6 +1,4 @@
 <script lang="ts">
-    import Dream from "$lib/Components/Dream.svelte";
-    import GetPeer from "$lib/Peer";
     import type { User } from "firebase/auth";
     import type { UserRoom } from "../../types/firebase/room";
     import type Peer from "peerjs";
@@ -10,7 +8,10 @@
         RemoveUser,
     } from "$lib/firestrore/Room";
     import { deleteDoc, setDoc } from "firebase/firestore";
-    import { BaseConnectionErrorType, type MediaConnection } from "peerjs";
+    import {
+        BaseConnectionErrorType
+
+    } from "../../../node_modules/peerjs";
     import DreamConnection from "./DreamConnection.svelte";
     import type { Call } from "../../types/Call";
     interface RoomProps {
@@ -32,6 +33,7 @@
     let users = $state<UserRoom[]>([]);
     let calls = $state<Call[]>([]);
     let localStream = $state<MediaStream | null>(null);
+    let components = [] as DreamConnection[];
 
     // FIRESTORE
     const user = {
@@ -67,7 +69,10 @@
             );
             return;
         }
-
+        let connection = null;
+        if (call.metadata && call.metadata.interactive === true) {
+            connection = peer.connect(call.peer);
+        }
         if (localStream) {
             console.log("Room: Answering Call with Stream");
             call.answer(localStream);
@@ -76,7 +81,7 @@
             call.answer();
         }
         let user = users.find((u) => u.peerId === call.peer) as UserRoom;
-        calls.push({ call, user });
+        calls.push({ call, user, connection });
     });
 
     let removeCall = (call: Call, redial: boolean) => {
@@ -158,14 +163,24 @@
             });
         };
     });
+    window.onkeydown = (e) => {
+        console.log("Room: Key pressed", e);
+        if (components.length == 0) return;
+        components[0].KeyEvent(e, true);
+    };
+    window.onkeyup = (e) => {
+        console.log("Room: Key released", e);
+        if (components.length == 0) return;
+        components[0].KeyEvent(e, false);
+    };
 </script>
 
-{#each calls as call}
+{#each calls as call, i}
     <p>{call.call.peer}</p>
     <DreamConnection
         {call}
         remove={(redial) => removeCall(call, redial)}
-        redial={() => redialCall(call)}
+        bind:this={components[i]}
     />
 {/each}
 

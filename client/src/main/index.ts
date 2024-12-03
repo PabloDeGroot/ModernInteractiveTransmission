@@ -3,8 +3,8 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { screen } from 'electron'
-import { Button, mouse, keyboard } from "@nut-tree-fork/nut-js"
-
+import { Button, mouse, keyboard, KeyboardClass, Key } from "@nut-tree-fork/nut-js"
+import type { ClickInput, KeyboardInput, ScrollInput } from "../renderer/types/Data"
 function createWindow(): void {
 
   let { width, height } = screen.getPrimaryDisplay().size; // TODO : get scale factor https://www.electronjs.org/docs/latest/api/structures/display  
@@ -21,7 +21,7 @@ function createWindow(): void {
     frame: false,
     width: width,
     height: height,
-    
+
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       //nodeIntegration: true,
@@ -72,35 +72,45 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
-  ipcMain.on("clickMouse", async (event, arg) => {
+  ipcMain.on("clickMouse", async (event, arg: ClickInput) => {
     mouse.click(Button.LEFT)
     let pos = await mouse.getPosition()
-    let point = [{ x: pos.x, y: pos.y }]
-    await mouse.move(point)
-    await mouse.click(arg.type);
+    let point = { x: arg.x, y: arg.y }
+    let btn = Button.LEFT
+    if (arg.button === "right") {
+      btn = Button.RIGHT
+    }
+    else if (arg.button === "middle") {
+      btn = Button.MIDDLE
+    }
+    await mouse.move([point])
+    await mouse.click(btn);
     await mouse.move([pos]);
     event.reply("clickMouse", "done");
 
   });
 
-  ipcMain.on('keyDown', async (event, arg) => {
-    console.log(arg);
-    var key = arg.key;
-    keyboard.pressKey(key);
-    event.reply('sendKey', "done");
-  });
-  ipcMain.on('keyUp', async (event, arg) => {
+  ipcMain.on('sendKey', async (event, arg: { key: Key, pressed: boolean }) => {
     var key = arg.key;
     console.log(arg);
-    keyboard.releaseKey(key);
+    if (arg.pressed) {
+      keyboard.pressKey(key);
+    } else {
+      keyboard.releaseKey(key);
+    }
     event.reply('sendKey', "done");
   });
-  ipcMain.on('scroll', async (event, arg) => {
-    var scroll = arg.scroll;
+  ipcMain.on('scroll', async (event, arg: ScrollInput) => {
+    var amount = arg.amount;
     var userPos = await mouse.getPosition();
-    mouse.move([{ x: arg.x, y: arg.y }]);
-    mouse.scrollDown(scroll);
-    mouse.move([{ x: userPos.x, y: userPos.y }]);
+    var newPos = { x: arg.x, y: arg.y };
+    mouse.move([newPos]);
+    if (arg.direction === "up") {
+      mouse.scrollUp(amount);
+    } else {
+      mouse.scrollDown(amount);
+    }
+    mouse.move([userPos]);
     event.reply('scroll', "done");
   });
   ipcMain.on('getRoom', async (event, arg) => {

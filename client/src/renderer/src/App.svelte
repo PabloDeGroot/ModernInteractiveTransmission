@@ -27,7 +27,7 @@
     if(users == null || users.length == 0) return;
     users.forEach((user) => {
       if(user.peerId == peer.id) return;
-      peer.connect(user.peerId)
+      //peer.connect(user.peerId)
     })
   });
 
