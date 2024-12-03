@@ -1,5 +1,3 @@
-
-<!-- svelte-ignore missing-declaration -->
 <script lang="ts">
   import GetRoom, { type Room, type UserRoom } from "../firebase/Room"
   import {Peer} from "peerjs"
@@ -16,20 +14,22 @@
       if(!doc) return;
       room = doc
     })
-  })
+  });
 
   let api = (window as any).api
   api.getRoom().then((data: any) => {
     roomName = data.roomName
-  })
-  // Get Stream
+  });
+  // Get Monitor Stream
+  // Call every user in the room
+  // Create User component and pass the connection
   $effect(()=>{
     if(users == null || users.length == 0) return;
     users.forEach((user) => {
       if(user.peerId == peer.id) return;
       peer.connect(user.peerId)
     })
-  })
+  });
 
     
 </script>
