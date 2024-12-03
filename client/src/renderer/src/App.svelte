@@ -1,17 +1,37 @@
 
 <!-- svelte-ignore missing-declaration -->
 <script lang="ts">
-  import GetRoom, { type UserRoom } from "../firebase/Room"
+  import GetRoom, { type Room, type UserRoom } from "../firebase/Room"
+  import {Peer} from "peerjs"
 
- // const ipcHandle = (): void => window.Electron.ipcRenderer.send('ping')
-let users = $state<UserRoom[]>([])
- let api = (window as any).api
-api.getRoom().then((data: any) => {
-  GetRoom(data).subscribe((data) => {
-    users = data.users;
+  let peer = new Peer()
+  // const ipcHandle = (): void => window.Electron.ipcRenderer.send('ping')
+  let users = $state<UserRoom[]>([])
+  let roomName = $state<string|null>(null)
+  let roomDoc = $derived(GetRoom(roomName));
+  let room = $state<Room|null>(null)
+  $effect(()=>{
+    if(!roomDoc) return;
+    roomDoc.subscribe((doc) => {
+      if(!doc) return;
+      room = doc
+    })
   })
-})
-  
+
+  let api = (window as any).api
+  api.getRoom().then((data: any) => {
+    roomName = data.roomName
+  })
+  // Get Stream
+  $effect(()=>{
+    if(users == null || users.length == 0) return;
+    users.forEach((user) => {
+      if(user.peerId == peer.id) return;
+      peer.connect(user.peerId)
+    })
+  })
+
+    
 </script>
 
 

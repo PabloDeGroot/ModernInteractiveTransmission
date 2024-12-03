@@ -24,6 +24,7 @@
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^3.0.0",
     "@nut-tree-fork/nut-js": "^4.2.2",
+    "peerjs": "^1.5.4",
     "svelte": "^5.5.0",
     "sveltefire": "^0.4.5"
   },
@@ -45,5 +46,4 @@
     "typescript": "^5.5.2",
     "vite": "^5.3.1"
   }
-
 }
