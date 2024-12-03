@@ -10,17 +10,28 @@
         RemoveUser,
     } from "$lib/firestrore/Room";
     import { deleteDoc, setDoc } from "firebase/firestore";
-    import type { MediaConnection } from "peerjs";
+    import { BaseConnectionErrorType, type MediaConnection } from "peerjs";
+    import DreamConnection from "./DreamConnection.svelte";
+    import type { Call } from "../../types/Call";
     interface RoomProps {
         firebaseUser: User;
         roomId: string;
         peer: Peer;
     }
+
+    /*
+    if call is closed and local stream is not null redial
+    when started to stream call all users that have not been called
+    users that have been called will be sent a message to redial
+
+    
+    
+    */
+
     let { firebaseUser, roomId, peer }: RoomProps = $props();
     let users = $state<UserRoom[]>([]);
-    //let user = $state<UserRoom | null>(null);
-    let media = $state<MediaStream[]>([]);
-    let callUsers: (media: MediaStream) => void;
+    let calls = $state<Call[]>([]);
+    let localStream = $state<MediaStream | null>(null);
 
     // FIRESTORE
     const user = {
@@ -31,13 +42,13 @@
     } as UserRoom;
     const roomDoc = GetRoom(roomId);
     roomDoc.subscribe((doc) => {
-        console.log("Document data:", doc);
+        console.log("Room: Document data:", doc);
         if (doc) {
             if (doc.users.find((u) => u.peerId === user.peerId) == null) {
                 AddUser(roomDoc.ref, user);
             }
             users = doc.users;
-            console.log("Document data:", doc.id);
+            console.log("Room: Document data:", doc.id);
         } else {
             //create room
             CreateRoom(roomDoc.ref).then(() => {
@@ -47,45 +58,76 @@
     });
     /// PEERJS
     peer.on("call", (call) => {
-        console.log("Call received");
-        call.answer();
-        call.on("stream", (remoteStream) => {
-            media.push(remoteStream);
-        });
-        call.on("close", () => {
-            console.log("Call closed");
-            media = media.filter((s) => s !== call.remoteStream);
-        });
-        
+        if (call.peer == peer.id) return;
+        console.log("Room: Call received", call);
+        if (calls.find((c) => c.call.peer === call.peer)) {
+            call.emitError(
+                BaseConnectionErrorType.NegotiationFailed,
+                "Call already exists",
+            );
+            return;
+        }
+
+        if (localStream) {
+            console.log("Room: Answering Call with Stream");
+            call.answer(localStream);
+        } else {
+            console.log("Room: Answering Call without Stream");
+            call.answer();
+        }
+        let user = users.find((u) => u.peerId === call.peer) as UserRoom;
+        calls.push({ call, user });
     });
 
-    peer.on("connection", (conn) => {
-        conn.on("data", (data) => {
-            console.log("Received", data);
-        });
-    });
-    // CALL USERS
-    callUsers = (media: MediaStream) => {
-        let calls =[] as MediaConnection[];
+    let removeCall = (call: Call, redial: boolean) => {
+        console.log("Room: Removing Call", $state.snapshot(call));
+        let index = calls.findIndex((c) => c.call === call.call);
+        if (index === -1) return;
+        calls.splice(index, 1);
+
+        call.call.close();
+
+        console.log("Room: Is Open", call.call.open);
+        console.log("Room: Redial", redial);
+        console.log("Local Stream", localStream);
+        if (localStream != null && redial) {
+            redialCall(call);
+        }
+        //call.call.close();
+    };
+    let redialCall = (call: Call) => {
+        console.log("Room: Redialing Call", call);
+        callUser(call.call.peer);
+    };
+    let callUsers = (media: MediaStream) => {
+        localStream = media;
         users.forEach((u) => {
-            if (peer == null || user == null) return;
-            if (u.peerId !== user.peerId) {
-                console.log("Calling", u.peerId);
-                const call = peer.call(u.peerId, media);
-                call.on("stream", (remoteStream) => {
-                    // Show stream in some video/canvas element.
-                });
-                calls.push(call);
+            if (u.peerId === user.peerId) return;
+            callUser(u.peerId);
+        });
+    };
+    let callUser = (peerid: string) => {
+        if (peer == null || localStream == null) return;
+        let call = calls.find((c) => c.call.peer === peerid)?.call;
+
+        if (call != null) {
+            console.log("Room: Call already exists");
+            call.dataChannel.send("Stream Started");
+            return;
+        }
+
+        call = peer.call(peerid, localStream);
+        call.on("iceStateChanged", (state) => {
+            console.log("Room: ICE State Changed", state);
+            if (state == "disconnected") {
+                console.log("Room: ICE Disconnected");
+                removeCall({ call, user: null }, false);
             }
         });
-        media.getVideoTracks()[0].onended = () => {
-            console.log("Stream ended");
-            calls.forEach(c => c.close());
-
-           
-        };
+        let user = users.find((u) => u.peerId === peerid) as UserRoom;
+        calls.push({ call, user });
     };
-
+    // FIREBASE CLEANUP
     window.onbeforeunload = () => {
         if (user == null) return;
         if (roomDoc.ref == null) return;
@@ -96,32 +138,45 @@
         }
     };
     $effect(() => {
-        media.forEach(stream => {
-            stream.getVideoTracks().forEach(x=>x.onended = () => {
-                console.log("Stream ended");
-                media = media.filter(s => s !== stream);
+        if (localStream == null) return;
+        localStream.getVideoTracks()[0].onended = () => {
+            localStream = null;
+            console.log("Room: Stream ended");
+            console.log("Room: Removing Tracks...");
+            calls.forEach((call) => {
+                //localStream?.removeTrack(localStream!.getVideoTracks()[0]);
+                console.log(
+                    "Room: Sending Stream Ended Message",
+                    call.call.dataChannel,
+                );
+
+                try {
+                    call.call.dataChannel.send("Stream Ended");
+                } catch (e) {
+                    console.log("Room: Error sending message", e);
+                }
             });
-            stream.onremovetrack = () => {
-                console.log("Stream removed");
-                media = media.filter(s => s !== stream);
-            }
-        });
+        };
     });
 </script>
 
-{#if media}
-    {#each media as stream}
-        <Dream {stream} local={false} />
-    {/each}
-{/if}
+{#each calls as call}
+    <p>{call.call.peer}</p>
+    <DreamConnection
+        {call}
+        remove={(redial) => removeCall(call, redial)}
+        redial={() => redialCall(call)}
+    />
+{/each}
 
-<button onclick={() => {
-    if (peer == null) return;
-    navigator.mediaDevices
-        .getDisplayMedia({ video: true, audio: true })
-        .then((media) => {
-            callUsers(media);
-        });
-
-
-}}>Call Users</button>
+<button
+    onclick={() => {
+        if (peer == null) return;
+        navigator.mediaDevices
+            .getDisplayMedia({ video: true, audio: true })
+            .then((media) => {
+                callUsers(media);
+            });
+    }}>Share</button
+>
+<button>Share with App</button>

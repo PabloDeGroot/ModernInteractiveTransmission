@@ -1,7 +1,11 @@
 <script lang="ts">
+    import type { UserRoom } from "../../types/firebase/room";
+
     interface DreamProps {
         stream: MediaStream;
         local: boolean;
+        user: UserRoom;
+        interarctive: boolean;
     }
     let { stream }: DreamProps = $props();
     let videoSource: HTMLVideoElement;
