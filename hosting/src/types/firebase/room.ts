@@ -10,5 +10,6 @@ export interface UserRoom{
     username: string,
     profilePic: string,
     peerId: string,
+    testId?: number,
     status: "streaming" | "streaming_with_app" | "idle" | "dialing" 
 }

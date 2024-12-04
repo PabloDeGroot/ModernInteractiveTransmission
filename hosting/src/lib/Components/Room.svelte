@@ -8,12 +8,15 @@
         RemoveUser,
     } from "$lib/firestrore/Room";
     import { deleteDoc, setDoc } from "firebase/firestore";
-    import {
-        BaseConnectionErrorType
-
-    } from "../../../node_modules/peerjs";
+    import { BaseConnectionErrorType } from "../../../node_modules/peerjs";
     import DreamConnection from "./DreamConnection.svelte";
     import type { Call } from "../../types/Call";
+
+    import MyPeer from "$lib/WebRTC/MyPeer";
+    import { FirestoreSignalingChannel } from "$lib/WebRTC/FirestoreSignalingChannel";
+    import { FirestoreCallChannel } from "$lib/WebRTC/FirestoreCallChannel";
+    import Dream from "./Dream.svelte";
+
     interface RoomProps {
         firebaseUser: User;
         roomId: string;
@@ -33,11 +36,39 @@
     let users = $state<UserRoom[]>([]);
     let calls = $state<Call[]>([]);
     let localStream = $state<MediaStream | null>(null);
+
+    let remoteStreams = $state<MediaStream[]>([]);
     let components = [] as DreamConnection[];
+
+    let signal = new FirestoreCallChannel(roomId);
+    let test = new MyPeer(signal);
+    test.onConnection = (conn) => {
+        console.log("Room: Connection", conn);
+        conn.data.onmessage = (data) => {
+            console.log("Room: Data received", data);
+        };
+        conn.data.onopen = () => {
+            conn.data.send("Hello from Peer: " + conn.id);
+        };
+
+        conn.pc.ontrack = (e) => {
+            console.log("Room: Track received", e);
+            remoteStreams.push(e.streams[0]);
+            conn.changePlayOutDelay();
+        };
+        if (localStream != null) {
+            conn.changePlayOutDelay();
+            localStream.getTracks().forEach((track) => {
+                conn.pc.addTrack(track, localStream!);
+            });
+        }
+    };
+    console.log("Room: Peer", test.id);
 
     // FIRESTORE
     const user = {
         peerId: peer.id,
+        testId: test.id,
         status: "idle",
         username: firebaseUser.displayName,
         profilePic: firebaseUser.photoURL,
@@ -106,6 +137,8 @@
     };
     let callUsers = (media: MediaStream) => {
         localStream = media;
+
+        test.call();
         users.forEach((u) => {
             if (u.peerId === user.peerId) return;
             callUser(u.peerId);
@@ -134,6 +167,7 @@
     };
     // FIREBASE CLEANUP
     window.onbeforeunload = () => {
+        test.close();
         if (user == null) return;
         if (roomDoc.ref == null) return;
         if (users.length === 1) {
@@ -175,6 +209,7 @@
     };
 </script>
 
+<!-- 
 {#each calls as call, i}
     <p>{call.call.peer}</p>
     <DreamConnection
@@ -182,6 +217,10 @@
         remove={(redial) => removeCall(call, redial)}
         bind:this={components[i]}
     />
+{/each} -->
+
+{#each remoteStreams as stream}
+    <Dream {stream} local={false} {user} interarctive={false} />
 {/each}
 
 <button

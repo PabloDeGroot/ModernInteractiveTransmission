@@ -1,18 +1,20 @@
-
 <script>
-    import { auth, firestore } from "$lib/firebase";
-    import { setContext } from "svelte";
-    import { FirebaseApp } from "sveltefire";
+    import Presence from "$lib/Components/Presence.svelte";
+import { auth, firestore, database } from "$lib/firebase";
 
-	let { children } = $props()
-
+    import { FirebaseApp, SignedIn } from "sveltefire";
+    let { children } = $props();
+    // Fetch the current user's ID from Firebase Authentication.
+    
 </script>
 
 <nav>
-	<a href="/">home</a>
-	<a href="/about">about</a>
+    <a href="/">home</a>
+    <a href="/about">about</a>
 </nav>
-<FirebaseApp auth={auth} firestore={firestore}>
-	
-{@render children()}
+<FirebaseApp {auth} {firestore}>
+    {@render children()}
+    <SignedIn>
+        <Presence></Presence>
+    </SignedIn>
 </FirebaseApp>
