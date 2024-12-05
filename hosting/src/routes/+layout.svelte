@@ -14,7 +14,5 @@ import { auth, firestore, database } from "$lib/firebase";
 </nav>
 <FirebaseApp {auth} {firestore}>
     {@render children()}
-    <SignedIn>
-        <Presence></Presence>
-    </SignedIn>
+
 </FirebaseApp>

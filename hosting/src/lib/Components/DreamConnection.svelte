@@ -8,39 +8,39 @@
     let { call, remove }: DreamConnectionProps = $props();
     let media = $state<MediaStream | null>(null);
     let readiling = false;
-    $effect(() => {
-        call.call.on("stream", (remoteStream) => {
-            console.log("DreamConnection: Stream received", remoteStream);
-            media = remoteStream;
-        });
-        call.call.on("willCloseOnRemote", () => {
-            console.log("DreamConnection: Will close on remote");
-            call.call.dataChannel.onmessage = (e) => {
-                console.log("DreamConnection: Message received", e.data);
-                if (e.data == "Stream Ended") {
-                    console.log("DreamConnection: Closing call");
-                    remove(true);
-                    readiling = true;
-                    media = null;
-                }
-                if (e.data == "Stream Started") {
-                    console.log("DreamConnection: Redialing");
-                    readiling = true;
-                    remove(true);
-                }
-            };
-            call.call.dataChannel.onclose = (e) => {
-                if (readiling) return;
+    // $effect(() => {
+    //     call.call.on("stream", (remoteStream) => {
+    //         console.log("DreamConnection: Stream received", remoteStream);
+    //         media = remoteStream;
+    //     });
+    //     call.call.on("willCloseOnRemote", () => {
+    //         console.log("DreamConnection: Will close on remote");
+    //         call.call.dataChannel.onmessage = (e) => {
+    //             console.log("DreamConnection: Message received", e.data);
+    //             if (e.data == "Stream Ended") {
+    //                 console.log("DreamConnection: Closing call");
+    //                 remove(true);
+    //                 readiling = true;
+    //                 media = null;
+    //             }
+    //             if (e.data == "Stream Started") {
+    //                 console.log("DreamConnection: Redialing");
+    //                 readiling = true;
+    //                 remove(true);
+    //             }
+    //         };
+    //         call.call.dataChannel.onclose = (e) => {
+    //             if (readiling) return;
 
-                console.log("DreamConnection: Data channel closed", e);
-                remove(false);
-            };
-        });
-    });
-    let sendData = (data: any) => {
-        if (call.connection == null) return;
-        call.connection.send(data);
-    };
+    //             console.log("DreamConnection: Data channel closed", e);
+    //             remove(false);
+    //         };
+    //     });
+    // });
+    // let sendData = (data: any) => {
+    //     if (call.connection == null) return;
+    //     call.connection.send(data);
+    // };
     let OnClick = (e: MouseEvent) => {
         let btn = "left";
         if (e.button == 1) btn = "middle";
@@ -53,7 +53,7 @@
             x: e.clientX,
             y: e.clientY,
         };
-        sendData(data);
+       //sendData(data);
         console.log("DreamConnection: Clicked");
     };
     let MouseMove = (e: MouseEvent) => {
@@ -64,7 +64,7 @@
             x: e.clientX,
             y: e.clientY,
         };
-        sendData(data);
+        //sendData(data);
         console.log("DreamConnection: Mouse moved");
     };
     let Scroll = (e: WheelEvent) => {
@@ -79,7 +79,7 @@
             direction: direction,
             amount: amount,
         };
-        sendData(data);
+        //sendData(data);
         console.log("DreamConnection: Scrolled");
     };
     export function KeyEvent(e: KeyboardEvent, down: boolean) {
@@ -89,15 +89,15 @@
             action: down ? "press" : "release",
             key: e.key,
         };
-        sendData(data);
+        //sendData(data);
         console.log("DreamConnection: Key pressed");
     }
-    call.call.on("close", () => {
-        if (call.connection == null) return;
+    // call.call.on("close", () => {
+    //     if (call.connection == null) return;
 
-        console.log("DreamConnection: Call closed");
-        //remove(false);
-    });
+    //     console.log("DreamConnection: Call closed");
+    //     //remove(false);
+    // });
 </script>
 
 {#if media != null}

@@ -35,13 +35,13 @@ const config: RTCConfiguration = {
 };
 
 class MyPeerConnection {
-    target: number;
-    id: number;
+    target: string;
+    id: string;
     caller: boolean;
     signaler: FirestoreSignalingChannel;
     pc = new RTCPeerConnection(config);
     data = this.pc.createDataChannel("data", { negotiated: true, id: 0 });
-    constructor(signaler: FirestoreSignalingChannel, target: number, id: number, caller: boolean) {
+    constructor(signaler: FirestoreSignalingChannel, target: string, id: string, caller: boolean) {
         this.signaler = signaler;
         this.target = target;
         this.id = id;
@@ -52,6 +52,7 @@ class MyPeerConnection {
         this.data.onclose = () => {
             this.cleanup();
         }
+        console.log("My Peer: Created", this.id, this.target);
     }
 
     cleanup = () => {
@@ -114,13 +115,14 @@ class MyPeerConnection {
     onConnected?: () => void;
     initSignaling = async () => {
         this.signaler.onmessage = async ({ description, candidate, id }) => {
+            console.log("My Peer: Signaling message", description, candidate, id);
             if (id !== this.target) {
                 return;
             }
             if (id === this.id) {
                 return;
             }
-            let polite = id < this.id;
+            let polite = this.caller;//id < this.id;
             console.log("Is Polite", polite);
             try {
                 if (description) {
@@ -195,7 +197,7 @@ class MyPeerConnection {
 class MyPeer {
     caller: FirestoreCallChannel;
     conns: MyPeerConnection[] = [];
-    id: number;
+    id: string;
     onConnection?: (peer: MyPeerConnection) => void;
     onCall?: () => void;
     call = () => {
@@ -210,9 +212,10 @@ class MyPeer {
     // }
     //pc = new RTCPeerConnection(config);
     //data = this.pc.createDataChannel("data");
-    constructor(caller: FirestoreCallChannel) {
+    constructor(caller: FirestoreCallChannel, id: string) {
         this.caller = caller;
-        this.id = Math.floor(Math.random() * 1000000);
+        this.id = id;
+        //this.id = Math.floor(Math.random() * 1000000);
         this.initCalls();
 
     }
@@ -228,8 +231,13 @@ class MyPeer {
             //this.onConnection?.(connection);
         }
         this.caller.onConnection = (readDoc, writeDoc) => {
+            console.log("My Peer: Connection recived", readDoc, writeDoc);
             let signal = new FirestoreSignalingChannel(this.caller.roomID, readDoc, writeDoc);
-            let connection = new MyPeerConnection(signal, parseInt(readDoc.id), this.id, true);
+            let callee = readDoc.id == this.id;
+            let target = callee ?  readDoc.parent.parent!.id : readDoc.id;
+            if(target == this.id){}
+            console.log("My Peer: IsCallee", callee);
+            let connection = new MyPeerConnection(signal, target, this.id, callee);
             this.conns.push(connection);
             connection.onConnected = () => {
                 this.onConnection?.(connection);

@@ -2,25 +2,23 @@
     import { page } from "$app/stores";
     import { auth } from "$lib/firebase";
     import { SignedIn, SignedOut, userStore } from "sveltefire";
-    import { Peer } from "peerjs";
-    import GetPeer from "$lib/Peer";
     import Room from "$lib/Components/Room.svelte";
-
-    let peer = $state<Peer | null>(null);
-    GetPeer().then((p) => {
-        peer = p;
+    let ready = $state(false);
+    auth.authStateReady().then(() => {
+        ready = true;
     });
 </script>
 
-<h1>{$page.params.slug}</h1>
-
-{#if peer == null}
+{#if !ready}
     <p>Loading...</p>
 {:else}
+    <h1>{$page.params.slug}</h1>
+
     <SignedIn let:user>
-        <Room firebaseUser={user} roomId={$page.params.slug} {peer} />
+        <Room firebaseUser={user} roomId={$page.params.slug} />
     </SignedIn>
     <SignedOut>
+       
         <script>
             window.location.href = "/";
         </script>

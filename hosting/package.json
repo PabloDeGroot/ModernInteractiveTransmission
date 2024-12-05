@@ -3,7 +3,6 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
-  
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -22,7 +21,6 @@
   "dependencies": {
     "@sveltejs/kit": "^2.8.5",
     "firebase": "^11.0.2",
-    "peerjs": "^1.5.4",
     "sveltefire": "^0.4.5",
     "sveltekit-adapter-firebase": "^0.1.13"
   }

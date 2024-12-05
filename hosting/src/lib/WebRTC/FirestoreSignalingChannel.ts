@@ -13,27 +13,37 @@ class FirestoreSignalingChannel implements ISignalingChannel {
     //docRef: DocumentReference<DocumentData>;
     //callRef: DocumentReference<DocumentData>;
 
+        data: {data: string[]};
     constructor(roomId: string, readRef: DocumentReference<DocumentData>, sendRef: DocumentReference<DocumentData>) {
 
         this.roomID = roomId;
         this.readRef = readRef;
         this.sendRef = sendRef;
+        this.data = {data: []};
         onSnapshot(this.readRef, (doc) => {
             if (!doc.data()?.data) return;
             console.log("Signaler: Emitting onmessage", doc.data());
-            this.onmessage?.(JSON.parse(doc.data()!.data));
+            // get new data
+            let alldata = doc.data()!.data as string[];
+            // get old data
+            let oldData = this.data;
+            // get the new data
+            let newData = alldata.filter((d) => !oldData.data.includes(d));
+            this.data = {data: alldata};
+            newData.forEach(d => {
+                this.onmessage?.(JSON.parse(d));                
+            });
         });
 
     }
 
     send(data: any): void {
         console.log("sending", data);
-        let d = { data: JSON.stringify(data) };
 
-        setDoc(this.sendRef, d);
+        setDoc(this.sendRef, {data: arrayUnion(JSON.stringify(data))}, {merge: true});
     }
     close = async () => {
-        deleteDoc(this.sendRef);
+        //deleteDoc(this.sendRef);
     }
     onmessage?: ((message: any) => void);
 

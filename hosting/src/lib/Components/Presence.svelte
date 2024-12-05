@@ -1,9 +1,14 @@
-<script>
+<script lang="ts">
     import { ref, onValue, onDisconnect, set } from "firebase/database";
     import { setContext } from "svelte";
     import { serverTimestamp } from "firebase/database";
     import { auth, database } from "$lib/firebase";
     var uid = auth.currentUser?.uid;
+
+    interface PresenceProps {
+        roomID: string;
+    }
+    let { roomID }: PresenceProps = $props();
 
     // Create a reference to this user's specific status node.
     // This is where we will store data about being online/offline.
@@ -11,7 +16,7 @@
 
     // We'll create two constants which we will write to
     // the Realtime database when this device is offline
-    // or online.
+    // or online.ñ
     var isOfflineForDatabase = {
         state: "offline",
         last_changed: serverTimestamp(),
@@ -19,6 +24,7 @@
 
     var isOnlineForDatabase = {
         state: "online",
+        roomID: roomID,
         last_changed: serverTimestamp(),
     };
 

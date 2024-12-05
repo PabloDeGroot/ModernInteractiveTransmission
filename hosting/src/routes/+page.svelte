@@ -4,6 +4,7 @@
     import {
         GoogleAuthProvider,
         signInWithPopup,
+        signInAnonymously,
     } from "firebase/auth";
     const provider = new GoogleAuthProvider();
 </script>
@@ -14,6 +15,10 @@
             
             <button on:click={() => signInWithPopup(auth, provider)}
                 >logIn</button
+            >
+            
+            <button on:click={() => signInAnonymously(auth)}
+                >Anon logIn</button
             >
         </SignedOut>
         <SignedIn let:auth let:signOut let:user>

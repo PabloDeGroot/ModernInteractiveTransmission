@@ -7,7 +7,7 @@ import { doc, collection, onSnapshot, setDoc, arrayUnion, query, deleteDoc, getD
 import type { Unsubscribe } from "firebase/auth";
 
 
-class FirestoreCallChannel implements ICallChannel {
+class FirestoreCallChannel /*implements ICallChannel*/ {
     roomID: string;
     //docRef: DocumentReference<DocumentData>;
     //callRef: DocumentReference<DocumentData>;
@@ -28,28 +28,29 @@ class FirestoreCallChannel implements ICallChannel {
             doc.docChanges().forEach((change) => {
                 if (change.type === "added") {
                     console.log("Signaler: Emitting onCall", change.doc.id);
-                    this.onCall?.(parseInt(change.doc.id));
+                    this.onCall?.(change.doc.id);
                 }
             });
         })];
 
     }
-    awnser = (caller: number, callee: number) => {
+    awnser = (caller: string, callee: string) => {
         let awnsRef = doc(this.answerCollection, caller.toString(), "0", callee.toString());
         setDoc(awnsRef, {});
-        let callRef = doc(this.callCollection, caller.toString());
+        let callRef = doc(this.callCollection, caller.toString(),"0", callee.toString());
         this.onConnection?.(callRef, awnsRef);
 
     };
-    call = (id: number) => {
-        let docRef = doc(this.callCollection, id.toString());
+    call = (caller: string)  => {
+        let docRef = doc(this.callCollection, caller.toString());
         setDoc(docRef, {});
-        let answerRef = collection(this.answerCollection, id.toString(), "0");
-        let un = onSnapshot(answerRef, (doc) => {
-            doc.docChanges().forEach((change) => {
+        let answerRef = collection(this.answerCollection, caller.toString(), "0");
+        let un = onSnapshot(answerRef, (d) => {
+            d.docChanges().forEach((change) => {
                 if (change.type === "added") {
                     console.log("Signaler: Emitting onAnswer", change.doc.id);
-                    this.onConnection?.(change.doc.ref, docRef);
+                    let a = doc(this.callCollection, caller.toString(),"0", change.doc.id.toString());
+                    this.onConnection?.(change.doc.ref, a);
                 }
             });
         });
@@ -57,23 +58,23 @@ class FirestoreCallChannel implements ICallChannel {
         return docRef;
 
     };
-    close = async (id: number) => {
-        let docRef = doc(this.callCollection, id.toString());
-        deleteDoc(docRef);
-        let answerRef = collection(this.answerCollection, id.toString(), "0");
-        let query = await getDocs(answerRef);
-        query.forEach(async (doc) => {
-            console.log("deleting", doc.id);
-            await deleteDoc(doc.ref);
-        });
-        deleteDoc(doc(this.answerCollection, id.toString()));
+    close = async (id: string) => {
+        // let docRef = doc(this.callCollection, id.toString());
+        // deleteDoc(docRef);
+        // let answerRef = collection(this.answerCollection, id.toString(), "0");
+        // let query = await getDocs(answerRef);
+        // query.forEach(async (doc) => {
+        //     console.log("deleting", doc.id);
+        //     await deleteDoc(doc.ref);
+        // });
+        // //deleteDoc(doc(this.answerCollection, id.toString()));
 
         this.unsubscribe.forEach((un) => un());
 
 
     };
 
-    onCall?: ((id: number) => void);
+    onCall?: ((id: string) => void);
     onConnection?: (read: DocumentReference<DocumentData>, write: DocumentReference<DocumentData>) => void;
 
 }
