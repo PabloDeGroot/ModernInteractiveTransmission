@@ -4,7 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { screen } from 'electron'
 import { Button, mouse, keyboard, KeyboardClass, Key } from "@nut-tree-fork/nut-js"
-import type { ClickInput, KeyboardInput, ScrollInput } from "../renderer/types/Data"
+
 function createWindow(): void {
 
   let { width, height } = screen.getPrimaryDisplay().size; // TODO : get scale factor https://www.electronjs.org/docs/latest/api/structures/display  
@@ -72,7 +72,7 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
-  ipcMain.on("clickMouse", async (event, arg: ClickInput) => {
+  ipcMain.on("clickMouse", async (event, arg) => {
     mouse.click(Button.LEFT)
     let pos = await mouse.getPosition()
     let point = { x: arg.x, y: arg.y }
@@ -100,7 +100,7 @@ app.whenReady().then(() => {
     }
     event.reply('sendKey', "done");
   });
-  ipcMain.on('scroll', async (event, arg: ScrollInput) => {
+  ipcMain.on('scroll', async (event, arg) => {
     var amount = arg.amount;
     var userPos = await mouse.getPosition();
     var newPos = { x: arg.x, y: arg.y };

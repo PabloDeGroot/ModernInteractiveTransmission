@@ -1,41 +1,33 @@
 <script lang="ts">
-  import GetRoom, { type Room, type UserRoom } from "../firebase/Room"
-  import {Peer} from "peerjs"
+  import GetRoom, { type Room, type UserRoom } from '../firebase/Room'
+  import { FirestoreCallChannel } from '../WebRTC/FirestoreCallChannel'
+  import MyPeer from '../WebRTC/MyPeer'
 
-  let peer = new Peer()
   // const ipcHandle = (): void => window.Electron.ipcRenderer.send('ping')
-  let users = $state<UserRoom[]>([])
-  let roomName = $state<string|null>(null)
-  let roomDoc = $derived(GetRoom(roomName));
-  let room = $state<Room|null>(null)
-  $effect(()=>{
-    if(!roomDoc) return;
-    roomDoc.subscribe((doc) => {
-      if(!doc) return;
-      room = doc
-    })
-  });
+
+  let roomName = $state<string | null>(null)
+  let userId = $state<string | null>(null)
+  let callChannel = $derived(new FirestoreCallChannel(roomName))
+  let peer = $derived(new MyPeer(callChannel, userId))
+  $effect(() => {
+    if(!peer) return;
+    peer.onConnection = (conn) => {
+      console.log('Connection', conn)
+    }
+    peer.call()
+  })
+
 
   let api = (window as any).api
   api.getRoom().then((data: any) => {
     roomName = data.roomName
-  });
+  })
+  api.getUserId().then((data: any) => {
+    userId = data.userId
+  })
   // Get Monitor Stream
   // Call every user in the room
   // Create User component and pass the connection
-  $effect(()=>{
-    if(users == null || users.length == 0) return;
-    users.forEach((user) => {
-      if(user.peerId == peer.id) return;
-      //peer.connect(user.peerId)
-    })
-  });
-
-    
 </script>
 
-
 <p>dsadsadasdsadsadadd</p>
-{#each users as user}
-  <p>{user.peerId}</p>
-{/each}
