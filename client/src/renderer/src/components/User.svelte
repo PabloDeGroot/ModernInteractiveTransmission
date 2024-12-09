@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { UserRoom } from '../../firebase/Room'
-  import { Data, Create, MoveInput } from '../../types/Data'
+  //import type { UserRoom } from '../../firebase/Room'
+  import { Data, Create } from '../../types/Data'
   import Cursor from './Cursor.svelte'
   import { MyPeerConnection } from '../../WebRTC/MyPeer'
 
@@ -22,9 +22,10 @@
   $effect(() => {
     if (connection == null) return
     connection.data.onmessage = (event) => {
-      let data: Data = event.data //JSON.parse(event.data)
+      let data: Data = JSON.parse(event.data)
       console.log(data)
       let p = Create(data)
+      if (p == null) return
       p.MoveMouse = SetPosition
       p.CreateObject = CreateObject
       p.IPC = electronIpc

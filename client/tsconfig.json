@@ -4,24 +4,14 @@
     "src/renderer/src/env.d.ts",
     "src/renderer/src/**/*",
     "src/renderer/src/**/*.svelte",
-    "./src/renderer/src/*.svelte.ts",
-    "src/preload/*.d.ts",
-    "src/preload/**/*.ts",
-    "./types/**/$types.d.ts",
-    "./svelte.config.js",
-		"../vite.config.js",
-		"../vite.config.ts",
-
+    "src/preload/*.d.ts"
   ],
   "compilerOptions": {
     "verbatimModuleSyntax": true,
     "useDefineForClassFields": true,
     "strict": false,
     "allowJs": true,
-    "noUnusedLocals": false,
     "checkJs": true,
-    "target": "ES2021",
-
     "lib": ["ESNext", "DOM", "DOM.Iterable"]
   },
   "references": [{ "path": "./tsconfig.node.json" }]

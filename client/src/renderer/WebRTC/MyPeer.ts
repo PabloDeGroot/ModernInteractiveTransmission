@@ -38,6 +38,10 @@ export class MyPeerConnection {
     target: string;
     id: string;
     caller: boolean;
+    //currentName: string;
+    //currentColor: string;
+    targetName: string;
+    targetColor: string;
     signaler: FirestoreSignalingChannel;
     pc = new RTCPeerConnection(config);
     data = this.pc.createDataChannel("data", { negotiated: true, id: 0 });
@@ -57,8 +61,6 @@ export class MyPeerConnection {
 
     cleanup = () => {
         this.signaler.close();
-
-        
     }
 
     makingOffer = false;
@@ -114,7 +116,7 @@ export class MyPeerConnection {
     }
     onConnected?: () => void;
     initSignaling = async () => {
-        this.signaler.onmessage = async ({ description, candidate, id }) => {
+        this.signaler.onmessage = async ({ description, candidate, id, color, name }) => {
             console.log("My Peer: Signaling message", description, candidate, id);
             if (id !== this.target) {
                 return;
@@ -122,6 +124,8 @@ export class MyPeerConnection {
             if (id === this.id) {
                 return;
             }
+            this.targetName = name;
+            this.targetColor = color;
             let polite = this.caller;//id < this.id;
             console.log("Is Polite", polite);
             try {

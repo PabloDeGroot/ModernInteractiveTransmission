@@ -35,13 +35,18 @@ exports.onUserStatusChanged = onValueUpdated({ ref: "status/{uid}", region: "eur
             let roomDoc = await roomRef.get();
             logger.info("roomDoc", roomDoc.data());
             let users = roomDoc.data()?.users as any[];
-            if (users != null && users.length === 1) {
+            let isApp = uid.startsWith("app_");
+            let usersInRoom = 1;
+            if (isApp) {
+                usersInRoom = 0;
+            }
+            if (users != null && users.length === usersInRoom) {
                 let result = await roomRef.delete();
 
                 await signalCollection.doc(oldRoomID).delete();
                 logger.info("Room deleted", result);
 
-            } else {
+            } else if (!isApp) {
                 let newUsers = users.filter(user => user.peerId !== uid);
                 await roomRef.update({ users: newUsers });
             }
@@ -64,9 +69,6 @@ exports.onUserStatusChanged = onValueUpdated({ ref: "status/{uid}", region: "eur
                     await callee.ref.delete();
                 };
             });
-
-
-
         } else {
             logger.info("User " + uid + " is online");
             // create Room

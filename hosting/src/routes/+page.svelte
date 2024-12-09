@@ -9,7 +9,7 @@
     const provider = new GoogleAuthProvider();
 </script>
 
-<main>
+<main >
 
         <SignedOut let:auth>
             

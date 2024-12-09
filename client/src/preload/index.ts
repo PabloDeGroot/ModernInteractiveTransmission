@@ -25,15 +25,16 @@ const api = {
     ipcRenderer.send('getRoom');
     return new Promise((resolve, reject) => {
       ipcRenderer.on('getRoom', (event, arg) => {
+        console.log("room1", arg);
         resolve(arg);
       });
     }
     );
   },
-  getUsername() {
-    ipcRenderer.send('getUsername');
+  getUserId() {
+    ipcRenderer.send('getUserId');
     return new Promise((resolve, reject) => {
-      ipcRenderer.on('getUsername', (event, arg) => {
+      ipcRenderer.on('getUserId', (event, arg) => {
         resolve(arg);
       });
     }

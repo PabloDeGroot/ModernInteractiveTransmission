@@ -1,13 +1,21 @@
 <script lang="ts">
     import Dream from "./Dream.svelte";
     import type { Call } from "../../types/Call";
+    import type { MyPeerConnection } from "$lib/WebRTC/MyPeer";
     interface DreamConnectionProps {
-        call: Call;
-        remove: (redial: boolean) => void;
+        call: MyPeerConnection;
+        remove?: (redial: boolean) => void;
     }
-    let { call, remove }: DreamConnectionProps = $props();
+    let { call, remove = $bindable() }: DreamConnectionProps = $props();
     let media = $state<MediaStream | null>(null);
-    let readiling = false;
+    call.pc.ontrack = (e) => {
+        console.log("Room: Track received", e);
+        media = e.streams[0];
+    };
+    let sendData = (data: any) => {
+        if (call.data == null) return;
+        call.data.send(JSON.stringify(data));
+    };
     // $effect(() => {
     //     call.call.on("stream", (remoteStream) => {
     //         console.log("DreamConnection: Stream received", remoteStream);
@@ -50,21 +58,23 @@
             device: "mouse",
             action: "click",
             button: btn,
-            x: e.clientX,
-            y: e.clientY,
+            x: e.offsetX,
+            y: e.offsetY,
         };
-       //sendData(data);
+        sendData(data);
         console.log("DreamConnection: Clicked");
     };
     let MouseMove = (e: MouseEvent) => {
+        //let {width, height} = (e.target as HTMLElement).getBoundingClientRect();
         let data = {
             type: "BasicInput",
             device: "mouse",
             action: "move",
-            x: e.clientX,
-            y: e.clientY,
+            x: e.offsetX,
+            y: e.offsetY,
         };
-        //sendData(data);
+        
+        sendData(data);
         console.log("DreamConnection: Mouse moved");
     };
     let Scroll = (e: WheelEvent) => {
@@ -74,12 +84,12 @@
             type: "BasicInput",
             device: "mouse",
             action: "scroll",
-            x: e.clientX,
-            y: e.clientY,
+            x: e.offsetX,
+            y: e.offsetY,
             direction: direction,
             amount: amount,
         };
-        //sendData(data);
+        sendData(data);
         console.log("DreamConnection: Scrolled");
     };
     export function KeyEvent(e: KeyboardEvent, down: boolean) {
@@ -89,7 +99,7 @@
             action: down ? "press" : "release",
             key: e.key,
         };
-        //sendData(data);
+        sendData(data);
         console.log("DreamConnection: Key pressed");
     }
     // call.call.on("close", () => {
@@ -103,8 +113,11 @@
 {#if media != null}
     <Dream
         interarctive={false}
-        user={call.user!}
         stream={media}
         local={false}
+        mouseMove={MouseMove}
+        mouseDown={OnClick}
+        mouseUp={OnClick}
+        mouseWheel={Scroll}
     />
 {/if}

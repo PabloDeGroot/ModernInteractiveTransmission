@@ -1,14 +1,16 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain,session, desktopCapturer } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { screen } from 'electron'
-import { Button, mouse, keyboard, KeyboardClass, Key } from "@nut-tree-fork/nut-js"
+//import { Button, mouse, keyboard, KeyboardClass, Key } from "@nut-tree-fork/nut-js"
+const path = require('path')
 
+let room = "room1";
+let user = "app_OFppzHR7PuVlmdY723qUKDh1B6A2";
 function createWindow(): void {
 
   let { width, height } = screen.getPrimaryDisplay().size; // TODO : get scale factor https://www.electronjs.org/docs/latest/api/structures/display  
-  let room = "room1";
   width = screen.getPrimaryDisplay().workAreaSize.width;
   height = screen.getPrimaryDisplay().workAreaSize.height;
   width = width * screen.getPrimaryDisplay().scaleFactor;
@@ -22,16 +24,18 @@ function createWindow(): void {
     width: width,
     height: height,
 
+
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
-      //nodeIntegration: true,
+      nodeIntegration: true,
+      contextIsolation: true,
       preload: join(app.getAppPath(), './out/preload/index.js'),
       sandbox: false
     }
   })
 
   //mainWindow.setAlwaysOnTop(true);
-  //mainWindow.setIgnoreMouseEvents(true);
+  mainWindow.setIgnoreMouseEvents(true);
 
   mainWindow.setFullScreenable(false);
   //mainWindow.setKiosk(true);
@@ -42,17 +46,18 @@ function createWindow(): void {
     mainWindow.show()
   })
 
+
+
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
-
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(app.getAppPath(), '../renderer/index.html'))
+    mainWindow.loadFile(join(app.getAppPath(), './src/renderer/index.html'))
   }
 }
 
@@ -62,6 +67,19 @@ function createWindow(): void {
 app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
+  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    
+    desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
+      // Grant access to the first screen found.
+      callback({ video: sources[0], audio: 'loopback' })
+      
+    })
+    // If true, use the system picker if available.
+    // Note: this is currently experimental. If the system picker
+    // is available, it will be used and the media request handler
+    // will not be invoked.
+  })
+
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
@@ -72,54 +90,54 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
-  ipcMain.on("clickMouse", async (event, arg) => {
-    mouse.click(Button.LEFT)
-    let pos = await mouse.getPosition()
-    let point = { x: arg.x, y: arg.y }
-    let btn = Button.LEFT
-    if (arg.button === "right") {
-      btn = Button.RIGHT
-    }
-    else if (arg.button === "middle") {
-      btn = Button.MIDDLE
-    }
-    await mouse.move([point])
-    await mouse.click(btn);
-    await mouse.move([pos]);
-    event.reply("clickMouse", "done");
+  // ipcMain.on("clickMouse", async (event, arg) => {
+  //   mouse.click(Button.LEFT)
+  //   let pos = await mouse.getPosition()
+  //   let point = { x: arg.x, y: arg.y }
+  //   let btn = Button.LEFT
+  //   if (arg.button === "right") {
+  //     btn = Button.RIGHT
+  //   }
+  //   else if (arg.button === "middle") {
+  //     btn = Button.MIDDLE
+  //   }
+  //   await mouse.move([point])
+  //   await mouse.click(btn);
+  //   await mouse.move([pos]);
+  //   event.reply("clickMouse", "done");
 
-  });
+  // });
 
-  ipcMain.on('sendKey', async (event, arg: { key: Key, pressed: boolean }) => {
-    var key = arg.key;
-    console.log(arg);
-    if (arg.pressed) {
-      keyboard.pressKey(key);
-    } else {
-      keyboard.releaseKey(key);
-    }
-    event.reply('sendKey', "done");
-  });
-  ipcMain.on('scroll', async (event, arg) => {
-    var amount = arg.amount;
-    var userPos = await mouse.getPosition();
-    var newPos = { x: arg.x, y: arg.y };
-    mouse.move([newPos]);
-    if (arg.direction === "up") {
-      mouse.scrollUp(amount);
-    } else {
-      mouse.scrollDown(amount);
-    }
-    mouse.move([userPos]);
-    event.reply('scroll', "done");
-  });
+  // ipcMain.on('sendKey', async (event, arg: { key: Key, pressed: boolean }) => {
+  //   var key = arg.key;
+  //   console.log(arg);
+  //   if (arg.pressed) {
+  //     keyboard.pressKey(key);
+  //   } else {
+  //     keyboard.releaseKey(key);
+  //   }
+  //   event.reply('sendKey', "done");
+  // });
+  // ipcMain.on('scroll', async (event, arg) => {
+  //   var amount = arg.amount;
+  //   var userPos = await mouse.getPosition();
+  //   var newPos = { x: arg.x, y: arg.y };
+  //   mouse.move([newPos]);
+  //   if (arg.direction === "up") {
+  //     mouse.scrollUp(amount);
+  //   } else {
+  //     mouse.scrollDown(amount);
+  //   }
+  //   mouse.move([userPos]);
+  //   event.reply('scroll', "done");
+  // });
   ipcMain.on('getRoom', async (event, arg) => {
-    //console.log(global.room);
-    event.reply('getRoom', "room1");
+    console.log("room", room);
+    event.reply('getRoom', room);
   });
-  ipcMain.on('getUsername', async (event, arg) => {
-    console.log(global.username);
-    event.reply('getUsername', global.username);
+  ipcMain.on('getUserId', async (event, arg) => {
+    console.log(user);
+    event.reply('getUserId', user);
   });
 
   setTimeout(function () {

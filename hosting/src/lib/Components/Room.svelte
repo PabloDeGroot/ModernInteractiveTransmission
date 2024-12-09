@@ -12,7 +12,7 @@
     import DreamConnection from "./DreamConnection.svelte";
     import type { Call } from "../../types/Call";
 
-    import MyPeer from "$lib/WebRTC/MyPeer";
+    import MyPeer, { MyPeerConnection } from "$lib/WebRTC/MyPeer";
     import { FirestoreSignalingChannel } from "$lib/WebRTC/FirestoreSignalingChannel";
     import { FirestoreCallChannel } from "$lib/WebRTC/FirestoreCallChannel";
     import Dream from "./Dream.svelte";
@@ -21,9 +21,11 @@
     interface RoomProps {
         firebaseUser: User;
         roomId: string;
+        color?: string;
     }
     var uid = auth.currentUser?.uid;
 
+    var name = auth.currentUser?.displayName;
     /*
     if call is closed and local stream is not null redial
     when started to stream call all users that have not been called
@@ -33,17 +35,19 @@
     
     */
 
-    let { firebaseUser, roomId }: RoomProps = $props();
+    let { firebaseUser, roomId, color = "red" }: RoomProps = $props();
     let users = $state<UserRoom[]>([]);
     let calls = $state<Call[]>([]);
+    let connections = $state<MyPeerConnection[]>([]);
     let localStream = $state<MediaStream | null>(null);
 
-    let remoteStreams = $state<MediaStream[]>([]);
+    //let remoteStreams = $state<MediaStream[]>([]);
     let components = [] as DreamConnection[];
 
     let signal = new FirestoreCallChannel(roomId);
-    let test = new MyPeer(signal, uid!);
+    let test = new MyPeer(signal, uid!, name!, color);
     test.onConnection = (conn) => {
+        connections.push(conn);
         console.log("Room: Connection", conn);
         conn.data.onmessage = (data) => {
             console.log("Room: Data received", data);
@@ -52,17 +56,17 @@
             conn.data.send("Hello from Peer: " + conn.id);
         };
 
-        conn.pc.ontrack = (e) => {
-            console.log("Room: Track received", e);
-            remoteStreams.push(e.streams[0]);
-            conn.changePlayOutDelay();
-        };
-        if (localStream != null) {
-            conn.changePlayOutDelay();
-            localStream.getTracks().forEach((track) => {
-                conn.pc.addTrack(track, localStream!);
-            });
-        }
+        // conn.pc.ontrack = (e) => {
+        //     console.log("Room: Track received", e);
+        //     //remoteStreams.push(e.streams[0]);
+        //     conn.changePlayOutDelay();
+        // };
+        // if (localStream != null) { // todo pass to DreamConnection
+        //     conn.changePlayOutDelay();
+        //     localStream.getTracks().forEach((track) => {
+        //         conn.pc.addTrack(track, localStream!);
+        //     });
+        // }
     };
     console.log("Room: Peer", test.id);
 
@@ -78,11 +82,14 @@
     roomDoc.subscribe((doc) => {
         console.log("Room: Document data:", doc);
         if (!doc) return;
-        
-        if (!doc.users || doc.users.find((u) => u.peerId === user.peerId) == null) {
+
+        if (
+            !doc.users ||
+            doc.users.find((u) => u.peerId === user.peerId) == null
+        ) {
             AddUser(roomDoc.ref, user);
         }
-        if(doc.users){
+        if (doc.users) {
             users = doc.users;
         }
         //users = doc.users;
@@ -163,7 +170,6 @@
     // FIREBASE CLEANUP
     window.onbeforeunload = () => {
         test.close();
-
     };
     $effect(() => {
         if (localStream == null) return;
@@ -208,8 +214,8 @@
     />
 {/each} -->
 
-{#each remoteStreams as stream}
-    <Dream {stream} local={false} {user} interarctive={false} />
+{#each connections as stream}
+    <DreamConnection call={stream} />
 {/each}
 
 <button

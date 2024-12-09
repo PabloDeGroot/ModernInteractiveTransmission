@@ -1,4 +1,4 @@
-import { Key, up } from "@nut-tree-fork/nut-js"
+//import { Key, up } from "@nut-tree-fork/nut-js"
 
 export abstract class Data {
     abstract type: "BasicInput" | "AdvancedInput"
@@ -75,20 +75,18 @@ export class KeyboardInput extends BasicInput {
     Run = () => {
         if (this.action === "press") {
             this.IPC.send("sendKey", {
-                key: this.charToKeyCode(this.key),
+                key: this.key,
                 pressed: true
             })
         }
         else if (this.action === "release") {
             this.IPC.send("sendKey", {
-                key: this.charToKeyCode(this.key),
+                key: this.key,
                 pressed: false
             })
         }
     }
-    charToKeyCode = (char: string) => {
-        return Key[char.toUpperCase()]
-    }
+
 }
 
 abstract class AdvancedInput extends Data {

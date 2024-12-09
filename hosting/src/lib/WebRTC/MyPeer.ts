@@ -38,14 +38,20 @@ class MyPeerConnection {
     target: string;
     id: string;
     caller: boolean;
+    myname: string;
+    myColor: string;
+    targetName?: string;
+    targetColor?: string;
     signaler: FirestoreSignalingChannel;
     pc = new RTCPeerConnection(config);
     data = this.pc.createDataChannel("data", { negotiated: true, id: 0 });
-    constructor(signaler: FirestoreSignalingChannel, target: string, id: string, caller: boolean) {
+    constructor(signaler: FirestoreSignalingChannel, target: string, id: string, caller: boolean, myname: string, myColor: string) {
         this.signaler = signaler;
         this.target = target;
         this.id = id;
         this.caller = caller;
+        this.myname = myname;
+        this.myColor = myColor;
         this.initPeerConnection();
         this.initSignaling();
         this.registerListeners();
@@ -58,7 +64,7 @@ class MyPeerConnection {
     cleanup = () => {
         this.signaler.close();
 
-        
+
     }
 
     makingOffer = false;
@@ -80,7 +86,7 @@ class MyPeerConnection {
                 this.makingOffer = true;
                 await this.pc.setLocalDescription();
                 console.log("My Peer: Local description set", this.pc.localDescription);
-                this.signaler.send({ description: this.pc.localDescription, id: this.id });
+                this.signaler.send({ description: this.pc.localDescription, id: this.id, color: this.myColor, name: this.myname });
             } catch (err) {
                 console.error(err);
             } finally {
@@ -99,7 +105,7 @@ class MyPeerConnection {
         this.pc.onicecandidate = (e) => {
             if (e.candidate === null) return;
             console.log("My Peer: ICE candidate", e.candidate);
-            this.signaler.send({ candidate: e.candidate, id: this.id })
+            this.signaler.send({ candidate: e.candidate, id: this.id, color: this.myColor, name: this.myname })
         };
     }
     ignoreOffer = false;
@@ -198,6 +204,8 @@ class MyPeer {
     caller: FirestoreCallChannel;
     conns: MyPeerConnection[] = [];
     id: string;
+    myname: string;
+    myColor: string;
     onConnection?: (peer: MyPeerConnection) => void;
     onCall?: () => void;
     call = () => {
@@ -212,9 +220,11 @@ class MyPeer {
     // }
     //pc = new RTCPeerConnection(config);
     //data = this.pc.createDataChannel("data");
-    constructor(caller: FirestoreCallChannel, id: string) {
+    constructor(caller: FirestoreCallChannel, id: string, myname: string, myColor: string) {
         this.caller = caller;
         this.id = id;
+        this.myname = myname;
+        this.myColor = myColor;
         //this.id = Math.floor(Math.random() * 1000000);
         this.initCalls();
 
@@ -234,10 +244,10 @@ class MyPeer {
             console.log("My Peer: Connection recived", readDoc, writeDoc);
             let signal = new FirestoreSignalingChannel(this.caller.roomID, readDoc, writeDoc);
             let callee = readDoc.id == this.id;
-            let target = callee ?  readDoc.parent.parent!.id : readDoc.id;
-            if(target == this.id){}
+            let target = callee ? readDoc.parent.parent!.id : readDoc.id;
+            if (target == this.id) { }
             console.log("My Peer: IsCallee", callee);
-            let connection = new MyPeerConnection(signal, target, this.id, callee);
+            let connection = new MyPeerConnection(signal, target, this.id, callee, this.myname, this.myColor);
             this.conns.push(connection);
             connection.onConnected = () => {
                 this.onConnection?.(connection);
@@ -250,3 +260,4 @@ class MyPeer {
 }
 
 export default MyPeer;
+export { MyPeerConnection };
