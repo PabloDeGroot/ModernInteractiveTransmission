@@ -1,5 +1,4 @@
 <script>
-  import "./app.css";
   import svelteLogo from "./assets/svelte.svg";
   import viteLogo from "/vite.svg";
   import { FirebaseApp, User, Doc, Collection } from "sveltefire";

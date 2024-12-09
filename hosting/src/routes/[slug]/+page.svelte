@@ -12,15 +12,21 @@
 {#if !ready}
     <p>Loading...</p>
 {:else}
-    <h1>{$page.params.slug}</h1>
-
     <SignedIn let:user>
-        <Room firebaseUser={user} roomId={$page.params.slug} />
+        <div class="card variant-ghost-primary -backdrop-hue-rotate-90 backdrop-blur-md flex flex-col items-center room ">
+            <Room firebaseUser={user} roomId={$page.params.slug} />
+        </div>
     </SignedIn>
     <SignedOut>
-       
         <script>
             window.location.href = "/";
         </script>
     </SignedOut>
 {/if}
+
+<style>
+    .room {
+        height: 95%;
+        width: 98%;
+    }
+</style>

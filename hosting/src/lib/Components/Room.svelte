@@ -213,18 +213,23 @@
         bind:this={components[i]}
     />
 {/each} -->
-
-{#each connections as stream}
-    <DreamConnection call={stream} />
-{/each}
-
-<button
-    onclick={() => {
-        navigator.mediaDevices
-            .getDisplayMedia({ video: true, audio: true })
-            .then((media) => {
-                callUsers(media);
-            });
-    }}>Share</button
->
-<button>Share with App</button>
+<div class="flex flex-col items-center justify-center w-full h-full">
+    <div class="flex-1">
+        {#each connections as stream}
+            <DreamConnection call={stream} />
+        {/each}
+    </div>
+    <div class="flex items-center justify-center w-full mb-3">
+        <button
+            class="btn variant-filled-secondary mr-4"
+            onclick={() => {
+                navigator.mediaDevices
+                    .getDisplayMedia({ video: true, audio: true })
+                    .then((media) => {
+                        callUsers(media);
+                    });
+            }}>Share</button
+        >
+        <button class="btn variant-filled-secondary">Share with App</button>
+    </div>
+</div>
