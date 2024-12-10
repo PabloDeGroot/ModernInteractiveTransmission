@@ -50,19 +50,16 @@
     test.onConnection = (conn) => {
         connections.push(conn);
         console.log("Room: Connection", conn);
-        conn.data.onmessage = (data) => {
-            console.log("Room: Data received", data);
-        };
-        conn.data.onopen = () => {
-            conn.data.send("Hello from Peer: " + conn.id);
-        };
+
         conn.onClose = () => {
             console.log("Room: Connection closed", conn);
             let index = connections.findIndex((c) => c === conn);
             if (index === -1) return;
             connections.splice(index, 1);
-        };
-
+        }; /*
+        conn.data.onmessage = (data) => {
+            console.log("Room: Data received", data);
+        };*/
         // conn.pc.ontrack = (e) => {
         //     console.log("Room: Track received", e);
         //     //remoteStreams.push(e.streams[0]);
@@ -175,6 +172,7 @@
     //     calls.push({ call, user });
     // };
     // FIREBASE CLEANUP
+    let mainDream = null as DreamConnection | null;
     window.onbeforeunload = () => {
         test.close();
     };
@@ -201,13 +199,11 @@
     });
     window.onkeydown = (e) => {
         console.log("Room: Key pressed", e);
-        if (components.length == 0) return;
-        components[0].KeyEvent(e, true);
+        mainDream?.KeyEvent(e, true);
     };
     window.onkeyup = (e) => {
         console.log("Room: Key released", e);
-        if (components.length == 0) return;
-        components[0].KeyEvent(e, false);
+        mainDream?.KeyEvent(e, false);
     };
 </script>
 
@@ -222,14 +218,17 @@
 {/each} -->
 <div class="flex flex-col items-center justify-center w-full h-full">
     <div class="flex-1 h-full">
-        <div class="main-dream h-full">
+        <div class="main-dream h-full flex justify-center">
             {#if connections.length == 0}
-                <p>
-                    No one is sharing, click the button bellow to start sharing
-                    your screen!
+                <p class="self-center">
+                    Waiting for someone to start sharing...
                 </p>
             {:else}
-                <DreamConnection call={connections[0]} {localStream} />
+                <DreamConnection
+                    bind:this={mainDream}
+                    call={connections[0]}
+                    {localStream}
+                />
             {/if}
         </div>
         {#if connections.length > 1}
@@ -248,17 +247,20 @@
             </div>
         {/if}
     </div>
-    <div class="flex items-center justify-center w-full mb-3 absolute bottom-0">
-        <button
-            class="btn variant-filled-secondary mr-4"
-            onclick={() => {
-                navigator.mediaDevices
-                    .getDisplayMedia({ video: true, audio: true })
-                    .then((media) => {
-                        callUsers(media);
-                    });
-            }}>Share</button
+
+        <div
+            class="flex items-center justify-center w-full mb-3 absolute bottom-0"
         >
-        <button class="btn variant-filled-secondary">Share with App</button>
-    </div>
+            <button
+                class="btn variant-filled-secondary mr-4"
+                onclick={() => {
+                    navigator.mediaDevices
+                        .getDisplayMedia({ video: true, audio: true })
+                        .then((media) => {
+                            callUsers(media);
+                        });
+                }}>Share</button
+            >
+            <button class="btn variant-filled-secondary">Share with App</button>
+        </div>
 </div>

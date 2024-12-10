@@ -23,6 +23,8 @@
   let app = initializeApp(firebaseConfig);
   let firestore = getFirestore(app);
   let auth = getAuth(app);
+
+
 </script>
 
 <main>

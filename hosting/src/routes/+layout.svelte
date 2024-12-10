@@ -3,6 +3,8 @@
     import { Gradient } from "../lib/Gradient";
     import { fade, scale } from "svelte/transition";
     import { auth, firestore } from "$lib/firebase";
+    import { page } from "$app/stores";
+    import { goto } from "$app/navigation";
 
     import { FirebaseApp, SignedIn } from "sveltefire";
     import { AppShell, Avatar, LightSwitch } from "@skeletonlabs/skeleton";
@@ -30,14 +32,12 @@
     //gradient.initGradient("#gradient-canvas");
     let canvas = $state<HTMLCanvasElement>();
     $effect(() => {
-        //gradient.initGradient("#gradient-canvas");
+        gradient.initGradient("#gradient-canvas");
     });
     let headerClass = $state("p-4");
     $effect(() => {
         headerClass = "p-2";
     });
-
-
     onNavigate((navigation) => {
         if (!document.startViewTransition) return;
 
@@ -48,10 +48,23 @@
             });
         });
     });
+    console.log("page", $page);
+    let from = $state(($page.params as any)?.slug);
+    console.log("from", from);
+    if (from) {
+        auth.onAuthStateChanged((user) => {
+            if (user != null) {
+                goto(from, {
+                    replaceState: true,
+                    state: {},
+                });
+            }
+        });
+    }
 </script>
 
 <FirebaseApp {auth} {firestore}>
-    <div class="dream flex flex-col items-center w-full h-screen ">
+    <div class="dream flex flex-col items-center w-full h-screen">
         <SignedIn let:auth let:signOut let:user>
             <header
                 class="transition-all flex items-center {headerClass} w-full bg-surface-700 bg-opacity-70 drop-shadow-lg backdrop-blur-md"
@@ -89,7 +102,9 @@
                 {/if}
             </header>
         </SignedIn>
-        <div class="flex flex-col items-center justify-center overflow-auto w-full">
+        <div
+            class="flex flex-col items-center justify-center overflow-auto h-full w-full"
+        >
             {@render children()}
         </div>
 

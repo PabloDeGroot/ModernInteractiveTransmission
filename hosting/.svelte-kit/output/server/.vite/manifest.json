@@ -8,12 +8,31 @@
       "_internal.js"
     ]
   },
+  "_ProgressRadial.js": {
+    "file": "chunks/ProgressRadial.js",
+    "name": "ProgressRadial",
+    "imports": [
+      "_index2.js",
+      "_index.js"
+    ],
+    "css": [
+      "_app/immutable/assets/ProgressRadial.c6i8ireL.css"
+    ]
+  },
   "_SignedOut.js": {
     "file": "chunks/SignedOut.js",
     "name": "SignedOut",
     "imports": [
       "_index2.js",
       "_index.js"
+    ]
+  },
+  "_client.js": {
+    "file": "chunks/client.js",
+    "name": "client",
+    "imports": [
+      "_index2.js",
+      "_exports.js"
     ]
   },
   "_exports.js": {
@@ -43,7 +62,7 @@
     "name": "stores",
     "imports": [
       "_index2.js",
-      "_exports.js"
+      "_client.js"
     ]
   },
   "node_modules/@sveltejs/kit/src/runtime/components/svelte-5/error.svelte": {
@@ -75,14 +94,14 @@
     "isEntry": true,
     "imports": [
       "_index2.js",
-      "_SignedOut.js"
+      "_SignedOut.js",
+      "_stores.js",
+      "_client.js",
+      "_ProgressRadial.js"
+    ],
+    "css": [
+      "_app/immutable/assets/_layout.uPf-rhWk.css"
     ]
-  },
-  "src/routes/+layout.ts": {
-    "file": "entries/pages/_layout.ts.js",
-    "name": "entries/pages/_layout.ts",
-    "src": "src/routes/+layout.ts",
-    "isEntry": true
   },
   "src/routes/+page.svelte": {
     "file": "entries/pages/_page.svelte.js",
@@ -91,6 +110,19 @@
     "isEntry": true,
     "imports": [
       "_index2.js",
+      "_SignedOut.js",
+      "_ProgressRadial.js",
+      "_client.js"
+    ]
+  },
+  "src/routes/[slug]/+layout.svelte": {
+    "file": "entries/pages/_slug_/_layout.svelte.js",
+    "name": "entries/pages/_slug_/_layout.svelte",
+    "src": "src/routes/[slug]/+layout.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index2.js",
+      "_stores.js",
       "_SignedOut.js"
     ]
   },
@@ -101,7 +133,14 @@
     "isEntry": true,
     "imports": [
       "_index2.js",
-      "_stores.js"
+      "_stores.js",
+      "_SignedOut.js",
+      "_index.js",
+      "_ProgressRadial.js",
+      "_client.js"
+    ],
+    "css": [
+      "_app/immutable/assets/_page.BH3NSKlF.css"
     ]
   }
 }

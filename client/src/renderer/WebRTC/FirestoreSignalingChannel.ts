@@ -43,6 +43,7 @@ class FirestoreSignalingChannel implements ISignalingChannel {
         setDoc(this.sendRef, {data: arrayUnion(JSON.stringify(data))}, {merge: true});
     }
     close = async () => {
+        this.send({type: "close"});
         //deleteDoc(this.sendRef);
     }
     onmessage?: ((message: any) => void);

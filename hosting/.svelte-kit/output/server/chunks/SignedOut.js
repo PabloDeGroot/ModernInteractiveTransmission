@@ -1,7 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { C as setContext, N as getContext, F as FILENAME, B as push, O as fallback, P as slot, Q as bind_props, E as pop, J as store_get, K as unsubscribe_stores } from "./index2.js";
+import { getDatabase } from "firebase/database";
+import { E as setContext, T as getContext, F as FILENAME, C as push, V as fallback, X as slot, R as bind_props, G as pop, I as store_get, J as unsubscribe_stores } from "./index2.js";
 import { w as writable } from "./index.js";
 let firebaseConfig = {
   apiKey: "AIzaSyBBtp0X-mJVTRHKFBMwt2_3pxIbfhhz_ak",
@@ -10,11 +11,13 @@ let firebaseConfig = {
   storageBucket: "dreamreactfirebase.firebasestorage.app",
   messagingSenderId: "622346676045",
   appId: "1:622346676045:web:a646ed4187bc79d7443904",
-  measurementId: "G-6FNYF33DY3"
+  measurementId: "G-6FNYF33DY3",
+  databaseURL: "https://dreamreactfirebase-default-rtdb.europe-west1.firebasedatabase.app"
 };
 let firebase = initializeApp(firebaseConfig);
 let firestore = getFirestore(firebase);
 let auth = getAuth(firebase);
+let database = getDatabase(firebase);
 function userStore(auth2, startWith = null) {
   let unsubscribe;
   if (!globalThis.window) {
@@ -118,8 +121,9 @@ SignedOut.render = function() {
 };
 export {
   FirebaseApp as F,
-  SignedOut as S,
+  SignedIn as S,
   auth as a,
-  SignedIn as b,
+  SignedOut as b,
+  database as d,
   firestore as f
 };

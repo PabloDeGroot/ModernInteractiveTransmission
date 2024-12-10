@@ -24,7 +24,17 @@
     
     let sendData = (data: any) => {
         if (call.data == null) return;
-        call.data.send(JSON.stringify(data));
+        let username = call.myname;
+        let color = call.myColor;
+        data = { ...data, username, color };
+        if (call.data.readyState != "open") {
+            call.data.onopen = () => {
+                call.data!.send(JSON.stringify(data));
+            };
+        }else{
+            
+            call.data.send(JSON.stringify(data));
+        }
     };
     // $effect(() => {
     //     call.call.on("stream", (remoteStream) => {
@@ -68,8 +78,8 @@
             device: "mouse",
             action: "click",
             button: btn,
-            x: e.offsetX,
-            y: e.offsetY,
+            x: e.offsetX / (e.target as HTMLElement).clientWidth,
+            y: e.offsetY / (e.target as HTMLElement).clientHeight,
         };
         sendData(data);
         console.log("DreamConnection: Clicked");
@@ -80,8 +90,8 @@
             type: "BasicInput",
             device: "mouse",
             action: "move",
-            x: e.offsetX,
-            y: e.offsetY,
+            x: e.offsetX / (e.target as HTMLElement).clientWidth,
+            y: e.offsetY / (e.target as HTMLElement).clientHeight,
         };
         
         sendData(data);
@@ -94,8 +104,8 @@
             type: "BasicInput",
             device: "mouse",
             action: "scroll",
-            x: e.offsetX,
-            y: e.offsetY,
+            x: e.offsetX / (e.target as HTMLElement).clientWidth,
+            y: e.offsetY / (e.target as HTMLElement).clientHeight,
             direction: direction,
             amount: amount,
         };
@@ -126,7 +136,7 @@
         stream={media}
         local={false}
         mouseMove={MouseMove}
-        mouseDown={OnClick}
+        mouseDown={()=>{/*TODO*/}}
         mouseUp={OnClick}
         mouseWheel={Scroll}
     />

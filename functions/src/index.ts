@@ -50,9 +50,11 @@ exports.onUserStatusChanged = onValueUpdated({ ref: "status/{uid}", region: "eur
                 let newUsers = users.filter(user => user.peerId !== uid);
                 await roomRef.update({ users: newUsers });
             }
-            await signalCollection.doc(oldRoomID).collection("call").doc(uid).delete();
+            //await signalCollection.doc(oldRoomID).collection("call").doc(uid).delete();
+            await admin.firestore().recursiveDelete(signalCollection.doc(oldRoomID).collection("call").doc(uid));
             logger.info("deleted call: " + oldRoomID + "/call/" + uid);
-            await signalCollection.doc(oldRoomID).collection("answer").doc(uid).delete();
+            //await signalCollection.doc(oldRoomID).collection("answer").doc(uid).delete();
+            await admin.firestore().recursiveDelete(signalCollection.doc(oldRoomID).collection("answer").doc(uid));
             let callsinans = await signalCollection.doc(oldRoomID).collection("answer").listDocuments();
             let calls = await signalCollection.doc(oldRoomID).collection("call").listDocuments();
             callsinans.forEach(async doc => {

@@ -44,7 +44,7 @@ class MyPeerConnection {
     targetColor?: string;
     signaler: FirestoreSignalingChannel;
     pc = new RTCPeerConnection(config);
-    data = this.pc.createDataChannel("data", { negotiated: true, id: 0 });
+    data = null as RTCDataChannel | null;
     constructor(signaler: FirestoreSignalingChannel, target: string, id: string, caller: boolean, myname: string, myColor: string) {
         this.signaler = signaler;
         this.target = target;
@@ -55,16 +55,49 @@ class MyPeerConnection {
         this.initPeerConnection();
         this.initSignaling();
         this.registerListeners();
-        this.data.onclose = () => {
-            this.cleanup();
-        }
+        this.pc.ondatachannel = ((e) => {
+            console.log("My Peer: Data channel created", e.channel);
+            this.data = e.channel;
+            this.data.onclose = () => {
+                this.cleanup();
+            }
+            this.data.addEventListener('message', (e) => {
+                if (typeof e.data === "string") {
+                    console.log("My Peer: Data channel message", e.data);
+                }
+                if (e.data == "close") {
+                    this.cleanup();
+                }
+            });
+            this.data.onerror = (e) => {
+                console.error(e);
+                this.cleanup();
+            }
+            this.data.onclosing = () => {
+                console.log("My Peer: Data channel closing");
+                this.cleanup();
+
+            }
+
+
+
+        });
         console.log("My Peer: Created", this.id, this.target);
     }
     onClose?: () => void;
 
     cleanup = () => {
+        console.log("My Peer: Cleanup");
         this.signaler.close();
-        this.onClose?.();
+        this.close();
+        this.pc.close();
+        this.data?.close();
+        if (this.onClose) {
+            console.log("My Peer: Close callback");
+            this.onClose();
+        } else {
+            console.log("My Peer: No close callback");
+        }
     }
 
     makingOffer = false;
@@ -120,12 +153,16 @@ class MyPeerConnection {
     }
     onConnected?: () => void;
     initSignaling = async () => {
-        this.signaler.onmessage = async ({ description, candidate, id }) => {
+        this.signaler.onmessage = async ({ description, candidate, id, type }) => {
             console.log("My Peer: Signaling message", description, candidate, id);
             if (id !== this.target) {
                 return;
             }
             if (id === this.id) {
+                return;
+            }
+            if (type == "close") {
+                this.cleanup();
                 return;
             }
             let polite = this.caller;//id < this.id;
@@ -135,7 +172,7 @@ class MyPeerConnection {
                     const offerCollision =
                         description.type === "offer" &&
                         (this.makingOffer || this.pc.signalingState !== "stable");
-                    if(this.pc.connectionState === "connected"){
+                    if (this.pc.connectionState === "connected") {
                         return;
                     }
 
@@ -150,12 +187,12 @@ class MyPeerConnection {
                         console.log("My Peer: Local description set", this.pc.localDescription);
 
                         this.signaler.send({ description: this.pc.localDescription, id: this.id });
-                    } else if (description.type === "answer") {
+                    } /*else if (description.type === "answer") {
                         //this.signaler.send({ description: this.pc.localDescription, id: this.id });
                         this.changePlayOutDelay();
                         //this.onConnection?.({ data: this.data, pc: this.pc });
 
-                    }
+                    }*/
 
                 } else if (candidate) {
                     try {
@@ -198,7 +235,7 @@ class MyPeerConnection {
     };
     close = () => {
         this.pc.close();
-        this.data.close();
+        this.data?.close();
     }
 
 }

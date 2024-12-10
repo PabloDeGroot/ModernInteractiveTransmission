@@ -12,27 +12,30 @@
     callChannel != null && userId != null ? new MyPeer(callChannel, userId) : null
   )
   let conns = $state<MyPeerConnection[]>([])
-  let media = new Promise<MediaStream>((resolve, reject) => {
-    navigator.mediaDevices
-      .getDisplayMedia({ video: true, audio: true })
-      .then((stream) => {
-        resolve(stream)
-      })
-      .catch((err) => {
-        reject(err)
-      })
+  let media = $state<MediaStream | null>(null)
+  window.addEventListener('beforeunload', () => {
+    conns.forEach((conn) => {
+      conn.close()
+    })
   })
+  navigator.mediaDevices
+    .getDisplayMedia({ video: true, audio: false })
+    .then((stream) => {
+      media = stream
+    })
+    .catch((err) => {
+      console.error('Error: ' + err)
+    })
 
   $effect(() => {
     if (!peer) return
     console.log('Peer', peer)
     peer.onConnection = async (conn) => {
-      console.log('Connection', conn)
-      let stream = await media
-      stream.getTracks().forEach((track) => {
-        conn.pc.addTrack(track, stream)
-      })
       conns.push(conn)
+      console.log('Connection', conn)
+      conn.onclose = () => {
+        conns = conns.filter((c) => c !== conn)
+      }
     }
     peer.call()
   })
@@ -45,18 +48,17 @@
   api.getUserId().then((data: any) => {
     userId = data
   })
+
   // Get Monitor Stream
   // Call every user in the room
   // Create User component and pass the connection
 </script>
 
-{#if conns.length > 0}
-  {#each conns as conn}
-    <User connection={conn} />
-  {/each}
-{/if}
 {#if userId != null && roomName != null}
   <Presence uid={userId} roomID={roomName} />
 {/if}
-
-<p>dsadsadasdsadsadadd</p>
+{#if conns.length > 0 && media != null}
+  {#each conns as conn}
+    <User connection={conn} localStream={media} />
+  {/each}
+{/if}

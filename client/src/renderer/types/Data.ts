@@ -3,6 +3,8 @@
 export abstract class Data {
     abstract type: "BasicInput" | "AdvancedInput"
     IPC!: Electron.IpcRenderer
+    username:string
+    color:string
     MoveMouse!: (x: number, y: number) => void
     CreateObject!: () => void
     abstract Run: () => void
@@ -21,9 +23,11 @@ abstract class MouseInput extends BasicInput {
     x: number
     y: number
     constructor(x: number, y: number) {
+        let screenWidth = window.screen.width
+        let screenHeight = window.screen.height
         super()
-        this.x = x
-        this.y = y
+        this.x = x * screenWidth
+        this.y = y * screenHeight
     }
 }
 

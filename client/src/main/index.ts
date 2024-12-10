@@ -1,9 +1,10 @@
-import { app, shell, BrowserWindow, ipcMain,session, desktopCapturer } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, session, desktopCapturer, Tray, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { screen } from 'electron'
-//import { Button, mouse, keyboard, KeyboardClass, Key } from "@nut-tree-fork/nut-js"
+import MenuBuilder from './menu'
+import { Button, mouse, keyboard, KeyboardClass, Key } from "@nut-tree-fork/nut-js"
 const path = require('path')
 
 let room = "room1";
@@ -34,14 +35,14 @@ function createWindow(): void {
     }
   })
 
-  //mainWindow.setAlwaysOnTop(true);
+  mainWindow.setAlwaysOnTop(true);
   mainWindow.setIgnoreMouseEvents(true);
 
   mainWindow.setFullScreenable(false);
-  //mainWindow.setKiosk(true);
-  //mainWindow.setMenu(null);
+  mainWindow.setKiosk(true);
+  mainWindow.setMenu(null);
   mainWindow.setMovable(false);
-  //mainWindow.setFocusable(false);
+  mainWindow.setFocusable(false);
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
@@ -59,7 +60,11 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(app.getAppPath(), './src/renderer/index.html'))
   }
+  const menuBuilder = new MenuBuilder(mainWindow);
+  menuBuilder.buildMenu();
+
 }
+
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
@@ -68,11 +73,11 @@ app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
-    
+
     desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
       // Grant access to the first screen found.
       callback({ video: sources[0], audio: 'loopback' })
-      
+
     })
     // If true, use the system picker if available.
     // Note: this is currently experimental. If the system picker
@@ -90,47 +95,62 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
-  // ipcMain.on("clickMouse", async (event, arg) => {
-  //   mouse.click(Button.LEFT)
-  //   let pos = await mouse.getPosition()
-  //   let point = { x: arg.x, y: arg.y }
-  //   let btn = Button.LEFT
-  //   if (arg.button === "right") {
-  //     btn = Button.RIGHT
-  //   }
-  //   else if (arg.button === "middle") {
-  //     btn = Button.MIDDLE
-  //   }
-  //   await mouse.move([point])
-  //   await mouse.click(btn);
-  //   await mouse.move([pos]);
-  //   event.reply("clickMouse", "done");
+  ipcMain.on("clickMouse", async (event, arg) => {
+    console.log("clickMouse");
+    console.log(arg);
 
-  // });
+    //mouse.click(Button.LEFT)
+    let pos = await mouse.getPosition()
+    let point = { x: arg.x, y: arg.y }
+    let btn = Button.LEFT
+    if (arg.button === "right") {
+      btn = Button.RIGHT
+    }
+    else if (arg.button === "middle") {
+      btn = Button.MIDDLE
+    }
+    await mouse.move([point])
+    await mouse.click(btn);
+    await mouse.move([pos]);
+    event.reply("clickMouse", "done");
 
-  // ipcMain.on('sendKey', async (event, arg: { key: Key, pressed: boolean }) => {
-  //   var key = arg.key;
-  //   console.log(arg);
-  //   if (arg.pressed) {
-  //     keyboard.pressKey(key);
-  //   } else {
-  //     keyboard.releaseKey(key);
-  //   }
-  //   event.reply('sendKey', "done");
-  // });
-  // ipcMain.on('scroll', async (event, arg) => {
-  //   var amount = arg.amount;
-  //   var userPos = await mouse.getPosition();
-  //   var newPos = { x: arg.x, y: arg.y };
-  //   mouse.move([newPos]);
-  //   if (arg.direction === "up") {
-  //     mouse.scrollUp(amount);
-  //   } else {
-  //     mouse.scrollDown(amount);
-  //   }
-  //   mouse.move([userPos]);
-  //   event.reply('scroll', "done");
-  // });
+  });
+
+  ipcMain.on('sendKey', async (event, arg: { key: string, pressed: boolean }) => {
+    var key = arg.key;
+    if (key.length === 1) {
+      key = key.toUpperCase();
+    }
+    if(key == "Shift"){
+      key = "LeftShift";
+    }
+    if(key == "Meta"){
+      key = "LeftWin";
+    }
+    
+    let keycode = Key[key as keyof KeyboardClass];
+    console.log(arg);
+    console.log(keycode);
+    if (arg.pressed) {
+      keyboard.pressKey(keycode);
+    } else {
+      keyboard.releaseKey(keycode);
+    }
+    event.reply('sendKey', "done");
+  });
+  ipcMain.on('scroll', async (event, arg) => {
+    var amount = arg.amount;
+    var userPos = await mouse.getPosition();
+    var newPos = { x: arg.x, y: arg.y };
+    mouse.move([newPos]);
+    if (arg.direction === "up") {
+      mouse.scrollUp(amount);
+    } else {
+      mouse.scrollDown(amount);
+    }
+    mouse.move([userPos]);
+    event.reply('scroll', "done");
+  });
   ipcMain.on('getRoom', async (event, arg) => {
     console.log("room", room);
     event.reply('getRoom', room);
@@ -139,9 +159,21 @@ app.whenReady().then(() => {
     console.log(user);
     event.reply('getUserId', user);
   });
-
+  let tray = null as Tray | null;
   setTimeout(function () {
     createWindow();
+    tray = new Tray(path.join(__dirname, '../../assets/icon.png'))
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Exit',
+        click: () => {
+          app.quit()
+        }
+      }
+    ])
+    tray.setToolTip('Estas compartiendo pantalla')
+    tray.setContextMenu(contextMenu)
+
   }, 10);
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

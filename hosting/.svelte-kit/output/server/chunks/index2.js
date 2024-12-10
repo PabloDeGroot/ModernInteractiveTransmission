@@ -191,6 +191,8 @@ function mark_reactions(signal, status) {
 const HYDRATION_START = "[";
 const HYDRATION_END = "]";
 const HYDRATION_ERROR = {};
+const ELEMENT_IS_NAMESPACED = 1;
+const ELEMENT_PRESERVE_ATTRIBUTE_CASE = 1 << 1;
 const FILENAME = Symbol("filename");
 var bold = "font-weight: bold";
 var normal = "font-weight: normal";
@@ -1135,6 +1137,68 @@ function pop$1(component) {
   throw_rune_error("$props");
   throw_rune_error("$bindable");
 }
+const DOM_BOOLEAN_ATTRIBUTES = [
+  "allowfullscreen",
+  "async",
+  "autofocus",
+  "autoplay",
+  "checked",
+  "controls",
+  "default",
+  "disabled",
+  "formnovalidate",
+  "hidden",
+  "indeterminate",
+  "ismap",
+  "loop",
+  "multiple",
+  "muted",
+  "nomodule",
+  "novalidate",
+  "open",
+  "playsinline",
+  "readonly",
+  "required",
+  "reversed",
+  "seamless",
+  "selected",
+  "webkitdirectory"
+];
+function is_boolean_attribute(name) {
+  return DOM_BOOLEAN_ATTRIBUTES.includes(name);
+}
+const PASSIVE_EVENTS = ["touchstart", "touchmove"];
+function is_passive_event(name) {
+  return PASSIVE_EVENTS.includes(name);
+}
+const ATTR_REGEX = /[&"<]/g;
+const CONTENT_REGEX = /[&<]/g;
+function escape_html(value, is_attr) {
+  const str = String(value ?? "");
+  const pattern = is_attr ? ATTR_REGEX : CONTENT_REGEX;
+  pattern.lastIndex = 0;
+  let escaped = "";
+  let last = 0;
+  while (pattern.test(str)) {
+    const i = pattern.lastIndex - 1;
+    const ch = str[i];
+    escaped += str.substring(last, i) + (ch === "&" ? "&amp;" : ch === '"' ? "&quot;" : "&lt;");
+    last = i + 1;
+  }
+  return escaped + str.substring(last);
+}
+const replacements = {
+  translate: /* @__PURE__ */ new Map([
+    [true, "yes"],
+    [false, "no"]
+  ])
+};
+function attr(name, value, is_boolean = false) {
+  if (value == null || !value && is_boolean || value === "" && name === "class") return "";
+  const normalized = name in replacements && replacements[name].get(value) || value;
+  const assignment = is_boolean ? "" : `="${escape_html(normalized, true)}"`;
+  return ` ${name}${assignment}`;
+}
 function validate_store(store, name) {
   if (store != null && typeof store.subscribe !== "function") {
     store_invalid_shape(name);
@@ -1355,12 +1419,12 @@ function is_tag_valid_with_parent(tag, parent_tag) {
 }
 let parent = null;
 let seen;
-function stringify(element) {
+function stringify$1(element) {
   if (element.filename === null) return `\`<${element.tag}>\``;
   return `\`<${element.tag}>\` (${element.filename}:${element.line}:${element.column})`;
 }
 function print_error(payload, parent2, child) {
-  var message = `node_invalid_placement_ssr: ${stringify(parent2)} cannot contain ${stringify(child)}
+  var message = `node_invalid_placement_ssr: ${stringify$1(parent2)} cannot contain ${stringify$1(child)}
 
 This can cause content to shift around as the browser repairs the HTML, and will likely result in a \`hydration_mismatch\` warning.`;
   if ((seen ??= /* @__PURE__ */ new Set()).has(message)) return;
@@ -1401,6 +1465,7 @@ function pop_element() {
   parent = /** @type {Element} */
   parent.parent;
 }
+const INVALID_ATTR_NAME_CHAR_REGEX = /[\s'">/=\u{FDD0}-\u{FDEF}\u{FFFE}\u{FFFF}\u{1FFFE}\u{1FFFF}\u{2FFFE}\u{2FFFF}\u{3FFFE}\u{3FFFF}\u{4FFFE}\u{4FFFF}\u{5FFFE}\u{5FFFF}\u{6FFFE}\u{6FFFF}\u{7FFFE}\u{7FFFF}\u{8FFFE}\u{8FFFF}\u{9FFFE}\u{9FFFF}\u{AFFFE}\u{AFFFF}\u{BFFFE}\u{BFFFF}\u{CFFFE}\u{CFFFF}\u{DFFFE}\u{DFFFF}\u{EFFFE}\u{EFFFF}\u{FFFFE}\u{FFFFF}\u{10FFFE}\u{10FFFF}]/u;
 let on_destroy = [];
 function render(component, options = {}) {
   const payload = { out: "", css: /* @__PURE__ */ new Set(), head: { title: "", out: "" } };
@@ -1435,6 +1500,38 @@ function render(component, options = {}) {
     body: payload.out
   };
 }
+function spread_attributes(attrs, classes, styles, flags = 0) {
+  let attr_str = "";
+  let name;
+  const is_html = (flags & ELEMENT_IS_NAMESPACED) === 0;
+  const lowercase = (flags & ELEMENT_PRESERVE_ATTRIBUTE_CASE) === 0;
+  for (name in attrs) {
+    if (typeof attrs[name] === "function") continue;
+    if (name[0] === "$" && name[1] === "$") continue;
+    if (INVALID_ATTR_NAME_CHAR_REGEX.test(name)) continue;
+    if (lowercase) {
+      name = name.toLowerCase();
+    }
+    attr_str += attr(name, attrs[name], is_html && is_boolean_attribute(name));
+  }
+  return attr_str;
+}
+function stringify(value) {
+  return typeof value === "string" ? value : value == null ? "" : value + "";
+}
+function style_object_to_string(style_object) {
+  return Object.keys(style_object).filter(
+    /** @param {any} key */
+    (key) => style_object[key] != null && style_object[key] !== ""
+  ).map(
+    /** @param {any} key */
+    (key) => `${key}: ${escape_html(style_object[key], true)};`
+  ).join(" ");
+}
+function add_styles(style_object) {
+  const styles = style_object_to_string(style_object);
+  return styles ? ` style="${styles}"` : "";
+}
 function store_get(store_values, store_name, store) {
   {
     validate_store(store, store_name.slice(1));
@@ -1466,6 +1563,28 @@ function slot(payload, $$props, name, slot_props, fallback_fn) {
     slot_fn(payload, slot_props);
   }
 }
+function rest_props(props, rest) {
+  const rest_props2 = {};
+  let key;
+  for (key in props) {
+    if (!rest.includes(key)) {
+      rest_props2[key] = props[key];
+    }
+  }
+  return rest_props2;
+}
+function sanitize_props(props) {
+  const { children, $$slots, ...sanitized } = props;
+  return sanitized;
+}
+function sanitize_slots(props) {
+  const sanitized = {};
+  if (props.children) sanitized.default = true;
+  for (const key in props.$$slots) {
+    sanitized[key] = true;
+  }
+  return sanitized;
+}
 function bind_props(props_parent, props_now) {
   for (const key in props_now) {
     const initial_value = props_parent[key];
@@ -1475,27 +1594,44 @@ function bind_props(props_parent, props_now) {
     }
   }
 }
+function ensure_array_like(array_like_or_iterator) {
+  if (array_like_or_iterator) {
+    return array_like_or_iterator.length !== void 0 ? array_like_or_iterator : Array.from(array_like_or_iterator);
+  }
+  return [];
+}
 export {
-  render as A,
-  push as B,
-  setContext as C,
+  noop as $,
+  mutable_source as A,
+  render as B,
+  push as C,
   DEV as D,
-  pop as E,
+  setContext as E,
   FILENAME as F,
-  push_element as G,
+  pop as G,
   HYDRATION_ERROR as H,
-  pop_element as I,
-  store_get as J,
-  unsubscribe_stores as K,
+  store_get as I,
+  unsubscribe_stores as J,
+  push_element as K,
   LEGACY_PROPS as L,
   invalid_default_snippet as M,
-  getContext as N,
-  fallback as O,
-  slot as P,
-  bind_props as Q,
-  noop as R,
-  safe_not_equal as S,
+  attr as N,
+  pop_element as O,
+  escape_html as P,
+  stringify as Q,
+  bind_props as R,
+  ensure_array_like as S,
+  getContext as T,
+  rest_props as U,
+  fallback as V,
+  spread_attributes as W,
+  slot as X,
+  sanitize_props as Y,
+  sanitize_slots as Z,
+  add_styles as _,
   set_active_effect as a,
+  subscribe_to_store as a0,
+  safe_not_equal as a1,
   active_reaction as b,
   active_effect as c,
   define_property as d,
@@ -1511,14 +1647,14 @@ export {
   array_from as n,
   effect_root as o,
   lifecycle_double_unmount as p,
-  create_text as q,
-  branch as r,
+  is_passive_event as q,
+  create_text as r,
   set_active_reaction as s,
-  push$1 as t,
-  pop$1 as u,
-  component_context as v,
-  get as w,
-  set as x,
-  flush_sync as y,
-  mutable_source as z
+  branch as t,
+  push$1 as u,
+  pop$1 as v,
+  component_context as w,
+  get as x,
+  set as y,
+  flush_sync as z
 };

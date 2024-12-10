@@ -44,7 +44,7 @@ export class MyPeerConnection {
     targetColor: string;
     signaler: FirestoreSignalingChannel;
     pc = new RTCPeerConnection(config);
-    data = this.pc.createDataChannel("data", { negotiated: true, id: 0 });
+    data = this.pc.createDataChannel("data");
     constructor(signaler: FirestoreSignalingChannel, target: string, id: string, caller: boolean) {
         this.signaler = signaler;
         this.target = target;
@@ -53,14 +53,33 @@ export class MyPeerConnection {
         this.initPeerConnection();
         this.initSignaling();
         this.registerListeners();
+        
+        this.pc.ondatachannel = ((e) => {
+
+            console.log("My Peer: Data channel created", e.channel);
+        });
         this.data.onclose = () => {
+            console.log("My Peer: Data channel closed");
+            this.cleanup();
+        }
+        this.data.onclosing = () => {
+            console.log("My Peer: Data channel closing");
+            this.cleanup();
+        }
+        this.data.onerror = () => {
+            console.log("My Peer: Data channel error");
             this.cleanup();
         }
         console.log("My Peer: Created", this.id, this.target);
     }
+    onclose: () => void;
 
     cleanup = () => {
         this.signaler.close();
+        this.onclose?.();
+        this.pc.close();
+        this.data.close();
+
     }
 
     makingOffer = false;
@@ -154,7 +173,9 @@ export class MyPeerConnection {
 
                 } else if (candidate) {
                     try {
-                        await this.pc.addIceCandidate(candidate);
+                        if (!this.pc.remoteDescription || !this.pc.remoteDescription.type) {
+                            await this.pc.addIceCandidate(candidate);
+                        }
                     } catch (err) {
                         if (!this.ignoreOffer) {
                             throw err;
@@ -193,6 +214,8 @@ export class MyPeerConnection {
     };
     close = () => {
         this.pc.close();
+        this.signaler.close();
+        this.data.send("close");
         this.data.close();
     }
 
@@ -238,15 +261,16 @@ class MyPeer {
             console.log("My Peer: Connection recived", readDoc, writeDoc);
             let signal = new FirestoreSignalingChannel(this.caller.roomID, readDoc, writeDoc);
             let callee = readDoc.id == this.id;
-            let target = callee ?  readDoc.parent.parent!.id : readDoc.id;
-            if(target == this.id){}
+            let target = callee ? readDoc.parent.parent!.id : readDoc.id;
+            if (target == this.id) { }
             console.log("My Peer: IsCallee", callee);
             let connection = new MyPeerConnection(signal, target, this.id, callee);
             this.conns.push(connection);
+            this.onConnection?.(connection);
+            /*
             connection.onConnected = () => {
-                this.onConnection?.(connection);
 
-            }
+            }*/
 
         }
     }

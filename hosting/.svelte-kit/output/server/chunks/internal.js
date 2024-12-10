@@ -1,4 +1,4 @@
-import { h as hydration_mismatch, H as HYDRATION_ERROR, g as get_next_sibling, d as define_property, s as set_active_reaction, a as set_active_effect, i as is_array, b as active_reaction, c as active_effect, e as init_operations, f as get_first_child, j as HYDRATION_START, k as HYDRATION_END, l as hydration_failed, m as clear_text_content, n as array_from, o as effect_root, p as lifecycle_double_unmount, q as create_text, r as branch, t as push, u as pop, v as component_context, w as get, L as LEGACY_PROPS, x as set, y as flush_sync, z as mutable_source, A as render, F as FILENAME, B as push$1, C as setContext, E as pop$1 } from "./index2.js";
+import { h as hydration_mismatch, H as HYDRATION_ERROR, g as get_next_sibling, d as define_property, s as set_active_reaction, a as set_active_effect, i as is_array, b as active_reaction, c as active_effect, e as init_operations, f as get_first_child, j as HYDRATION_START, k as HYDRATION_END, l as hydration_failed, m as clear_text_content, n as array_from, o as effect_root, p as lifecycle_double_unmount, q as is_passive_event, r as create_text, t as branch, u as push, v as pop, w as component_context, x as get, L as LEGACY_PROPS, y as set, z as flush_sync, A as mutable_source, B as render, F as FILENAME, C as push$1, E as setContext, G as pop$1 } from "./index2.js";
 let base = "";
 let assets = base;
 const initial = { base, assets };
@@ -138,10 +138,6 @@ function assign_nodes(start, end) {
     effect.nodes_start = start;
     effect.nodes_end = end;
   }
-}
-const PASSIVE_EVENTS = ["touchstart", "touchmove"];
-function is_passive_event(name) {
-  return PASSIVE_EVENTS.includes(name);
 }
 function mount(component, options2) {
   return _mount(component, options2);
@@ -420,7 +416,8 @@ function Root($$payload, $$props) {
     components = [],
     form,
     data_0 = null,
-    data_1 = null
+    data_1 = null,
+    data_2 = null
   } = $$props;
   {
     setContext("__svelte__", stores);
@@ -428,7 +425,7 @@ function Root($$payload, $$props) {
   {
     stores.page.set(page);
   }
-  const Pyramid_1 = constructors[1];
+  const Pyramid_2 = constructors[2];
   if (constructors[1]) {
     $$payload.out += "<!--[-->";
     const Pyramid_0 = constructors[0];
@@ -437,9 +434,29 @@ function Root($$payload, $$props) {
       data: data_0,
       form,
       children: ($$payload2) => {
-        $$payload2.out += `<!---->`;
-        Pyramid_1($$payload2, { data: data_1, form });
-        $$payload2.out += `<!---->`;
+        if (constructors[2]) {
+          $$payload2.out += "<!--[-->";
+          const Pyramid_1 = constructors[1];
+          $$payload2.out += `<!---->`;
+          Pyramid_1($$payload2, {
+            data: data_1,
+            form,
+            children: ($$payload3) => {
+              $$payload3.out += `<!---->`;
+              Pyramid_2($$payload3, { data: data_2, form });
+              $$payload3.out += `<!---->`;
+            },
+            $$slots: { default: true }
+          });
+          $$payload2.out += `<!---->`;
+        } else {
+          $$payload2.out += "<!--[!-->";
+          const Pyramid_1 = constructors[1];
+          $$payload2.out += `<!---->`;
+          Pyramid_1($$payload2, { data: data_1, form });
+          $$payload2.out += `<!---->`;
+        }
+        $$payload2.out += `<!--]-->`;
       },
       $$slots: { default: true }
     });
@@ -476,7 +493,7 @@ const options = {
   root,
   service_worker: false,
   templates: {
-    app: ({ head, body, assets: assets2, nonce, env }) => '<!doctype html>\r\n<html lang="en">\r\n	<head>\r\n		<meta charset="utf-8" />\r\n		<meta name="viewport" content="width=device-width, initial-scale=1" />\r\n\r\n		<!-- Import Ionicon icons & Google Fonts our Bootstrap theme relies on -->\r\n		<link\r\n			href="//code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css"\r\n			rel="stylesheet"\r\n			type="text/css"\r\n		/>\r\n		<link\r\n			href="//fonts.googleapis.com/css?family=Titillium+Web:700|Source+Serif+Pro:400,700|Merriweather+Sans:400,700|Source+Sans+Pro:400,300,600,700,300italic,400italic,600italic,700italic"\r\n			rel="stylesheet"\r\n			type="text/css"\r\n		/>\r\n		<!-- Import the custom Bootstrap 4 theme from our hosted CDN -->\r\n		<link rel="stylesheet" href="//demo.productionready.io/main.css" />\r\n\r\n		' + head + '\r\n	</head>\r\n	<body data-sveltekit-preload-data="hover">\r\n		<div>' + body + "</div>\r\n	</body>\r\n</html>",
+    app: ({ head, body, assets: assets2, nonce, env }) => '<!DOCTYPE html>\r\n<html lang="en" class="dark">\r\n	<head>\r\n		<meta charset="utf-8" />\r\n		<link rel="icon" href="' + assets2 + '/favicon.png" />\r\n		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=logout" />\r\n\r\n		<meta name="viewport" content="width=device-width" />\r\n		' + head + '\r\n	</head>\r\n	<body data-sveltekit-preload-data="hover" data-theme="skeleton">\r\n		<div style="display: contents">' + body + "</div>\r\n	</body>\r\n</html>",
     error: ({ status, message }) => '<!doctype html>\n<html lang="en">\n	<head>\n		<meta charset="utf-8" />\n		<title>' + message + `</title>
 
 		<style>
@@ -548,7 +565,7 @@ const options = {
 		<div class="error">
 			<span class="status">` + status + '</span>\n			<div class="message">\n				<h1>' + message + "</h1>\n			</div>\n		</div>\n	</body>\n</html>\n"
   },
-  version_hash: "l6kofs"
+  version_hash: "7aqhdi"
 };
 async function get_hooks() {
   return {};

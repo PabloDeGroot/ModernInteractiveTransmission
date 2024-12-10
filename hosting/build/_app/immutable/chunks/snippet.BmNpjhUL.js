@@ -1,1 +1,0 @@
-import{s as i,b as o,E as p,i as c,a as f,h as _,c as u,n as d,d as l,e as v}from"./runtime.CiZkIjR8.js";function m(r,a,...s){var t=r,n=d,e;o(()=>{n!==(n=a())&&(e&&(l(e),e=null),n==null&&c(),e=f(()=>n(t,...s)))},p),_&&(t=u)}function y(r,a){return(s,...t)=>{var n=v;i(r);try{return a(s,...t)}finally{i(n)}}}export{m as s,y as w};
