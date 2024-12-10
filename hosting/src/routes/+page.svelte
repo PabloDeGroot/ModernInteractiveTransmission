@@ -26,7 +26,6 @@
     let roomId = "";
 </script>
 
-
 <main class="flex justify-center items-center flex-1">
     {#if !ready}{:else}
         <SignedOut let:auth>
@@ -38,7 +37,9 @@
                 >
                     Sign In
                 </header>
-                <footer class="card-footer p-4 mb-5 mt-5 flex flex-col items-center">
+                <footer
+                    class="card-footer p-4 mb-5 mt-5 flex flex-col items-center"
+                >
                     <button
                         type="button"
                         class="btn variant-filled w-full"
@@ -61,33 +62,36 @@
             <div
                 class="card card-hover variant-ghost-primary -backdrop-hue-rotate-90 backdrop-blur-sm"
             >
-                <header
-                    class="card-header text-center text-lg font-bold underline underline-offset-4"
-                >
-                    Join a Room
-                </header>
+                <div class="card-content">
+                    <header
+                        class="card-header text-center text-lg font-bold underline underline-offset-4"
+                    >
+                        Join a Room
+                    </header>
 
-                <form
-                    onsubmit={(e) => {
-                        e.preventDefault();
-                        goto(`${roomId}`);
-                    }}
-                >
-                    <section class="p-4 mb-5 mt-5">
-                        <input
-                            bind:value={roomId}
-                            class="input p-1 rounded-md border-none outline-primary-500 placeholder-gray-300 backdrop-hue-rotate-180 !bg-transparent backdrop-brightness-50"
-                            title="Enter Room Id"
-                            type="text"
-                            placeholder="Enter Room Id"
-                        />
-                    </section>
-                    <footer class="card-footer">
-                        <button class="btn variant-filled-secondary w-full"
-                            >Join</button
-                        >
-                    </footer>
-                </form>
+                    <form
+                        onsubmit={(e) => {
+                            e.preventDefault();
+                            goto(`${roomId}`);
+                        }}
+                    >
+                        <section class="p-4 mb-5 mt-5">
+                            <input
+                                bind:value={roomId}
+                                class="input p-1 rounded-md border-none outline-primary-500 placeholder-gray-300 backdrop-hue-rotate-180  backdrop-brightness-50"
+                                style="background-color: #00000030;"
+                                title="Enter Room Id"
+                                type="text"
+                                placeholder="Enter Room Id"
+                            />
+                        </section>
+                        <footer class="card-footer">
+                            <button class="btn variant-filled-secondary w-full"
+                                >Join</button
+                            >
+                        </footer>
+                    </form>
+                </div>
             </div>
         </SignedIn>
     {/if}

@@ -2,3 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 @tailwind variants;
+
+
+
+.card {
+    view-transition-name: card;
+}
+
+.card-content {
+    view-transition-name: card-content;
+}
+
+/*
+.card > *{
+    view-transition-name: card-content;
+}*/
+
+
+
+::view-transition-new(card-content) {
+
+    opacity: 1;
+
+}
+
+::view-transition-old(card-content) {
+    opacity: 0;
+}
+
+/*
+::view-transition-group(.card > *) {
+    transition: opacity 0.5s;
+}
+    */

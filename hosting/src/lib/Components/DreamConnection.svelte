@@ -4,14 +4,24 @@
     import type { MyPeerConnection } from "$lib/WebRTC/MyPeer";
     interface DreamConnectionProps {
         call: MyPeerConnection;
+        localStream?: MediaStream | null;
         remove?: (redial: boolean) => void;
     }
-    let { call, remove = $bindable() }: DreamConnectionProps = $props();
+    let { call, localStream, remove = $bindable() }: DreamConnectionProps = $props();
     let media = $state<MediaStream | null>(null);
     call.pc.ontrack = (e) => {
         console.log("Room: Track received", e);
         media = e.streams[0];
     };
+    $effect(() => {
+        if (localStream != null) {
+            console.log("Room: Adding tracks to connection");
+            localStream.getTracks().forEach((track) => {
+                call.pc.addTrack(track, localStream!);
+            });
+        }
+    });
+    
     let sendData = (data: any) => {
         if (call.data == null) return;
         call.data.send(JSON.stringify(data));

@@ -37,8 +37,8 @@
     };
 </script>
 
-<div>
+<div class="rounded h-full overflow-hidden">
     <!-- svelte-ignore a11y_media_has_caption -->
-    <video style="cursor: none;" onmousemove={mouseMove} onmousedown={mouseDown} onmouseup={mouseUp} onwheel={mouseWheel} bind:this={videoSource} autoplay></video>
-    <button onclick={toggleMute}>{muted ? "Unmute" : "Mute"}</button>
+    <video class="max-h-full" style="cursor: none;" onmousemove={mouseMove} onmousedown={mouseDown} onmouseup={mouseUp} onwheel={mouseWheel} bind:this={videoSource} autoplay></video>
+    <!--<button onclick={toggleMute}>{muted ? "Unmute" : "Mute"}</button>-->
 </div>

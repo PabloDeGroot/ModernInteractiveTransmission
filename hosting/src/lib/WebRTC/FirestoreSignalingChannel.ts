@@ -13,13 +13,13 @@ class FirestoreSignalingChannel implements ISignalingChannel {
     //docRef: DocumentReference<DocumentData>;
     //callRef: DocumentReference<DocumentData>;
 
-        data: {data: string[]};
+    data: { data: string[] };
     constructor(roomId: string, readRef: DocumentReference<DocumentData>, sendRef: DocumentReference<DocumentData>) {
 
         this.roomID = roomId;
         this.readRef = readRef;
         this.sendRef = sendRef;
-        this.data = {data: []};
+        this.data = { data: [] };
         onSnapshot(this.readRef, (doc) => {
             if (!doc.data()?.data) return;
             console.log("Signaler: Emitting onmessage", doc.data());
@@ -29,9 +29,10 @@ class FirestoreSignalingChannel implements ISignalingChannel {
             let oldData = this.data;
             // get the new data
             let newData = alldata.filter((d) => !oldData.data.includes(d));
-            this.data = {data: alldata};
+            this.data = { data: alldata };
+            if (this.data.data.length > 20) { return }
             newData.forEach(d => {
-                this.onmessage?.(JSON.parse(d));                
+                this.onmessage?.(JSON.parse(d));
             });
         });
 
@@ -40,7 +41,7 @@ class FirestoreSignalingChannel implements ISignalingChannel {
     send(data: any): void {
         console.log("sending", data);
 
-        setDoc(this.sendRef, {data: arrayUnion(JSON.stringify(data))}, {merge: true});
+        setDoc(this.sendRef, { data: arrayUnion(JSON.stringify(data)) }, { merge: true });
     }
     close = async () => {
         //deleteDoc(this.sendRef);

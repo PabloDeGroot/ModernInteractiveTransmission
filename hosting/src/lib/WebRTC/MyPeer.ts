@@ -60,11 +60,11 @@ class MyPeerConnection {
         }
         console.log("My Peer: Created", this.id, this.target);
     }
+    onClose?: () => void;
 
     cleanup = () => {
         this.signaler.close();
-
-
+        this.onClose?.();
     }
 
     makingOffer = false;
@@ -80,9 +80,9 @@ class MyPeerConnection {
         // };
 
 
-        this.pc.onnegotiationneeded = async () => {
+        this.pc.onnegotiationneeded = async (e) => {
             try {
-                console.log("My Peer: Negotiation needed");
+                console.log("My Peer: Negotiation needed", e);
                 this.makingOffer = true;
                 await this.pc.setLocalDescription();
                 console.log("My Peer: Local description set", this.pc.localDescription);
@@ -135,6 +135,9 @@ class MyPeerConnection {
                     const offerCollision =
                         description.type === "offer" &&
                         (this.makingOffer || this.pc.signalingState !== "stable");
+                    if(this.pc.connectionState === "connected"){
+                        return;
+                    }
 
                     this.ignoreOffer = !polite && offerCollision;
                     if (this.ignoreOffer) {
@@ -249,10 +252,10 @@ class MyPeer {
             console.log("My Peer: IsCallee", callee);
             let connection = new MyPeerConnection(signal, target, this.id, callee, this.myname, this.myColor);
             this.conns.push(connection);
-            connection.onConnected = () => {
-                this.onConnection?.(connection);
+            //connection.onConnected = () => {
+            this.onConnection?.(connection);
 
-            }
+            //}
 
         }
     }
