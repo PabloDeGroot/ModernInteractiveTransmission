@@ -1,5 +1,5 @@
-import { T as fallback, V as slot, W as bind_props, S as pop, Q as push, X as rest_props, Y as spread_attributes, Z as attr, _ as stringify, $ as escape_html, a0 as sanitize_props, a1 as store_get, a2 as unsubscribe_stores, a3 as invalid_default_snippet } from "../../chunks/index2.js";
-import { s as setFirebaseContext, a as auth, f as firestore, S as SignedIn } from "../../chunks/SignedIn.js";
+import { F as FILENAME, C as push, I as store_get, J as unsubscribe_stores, G as pop, K as push_element, M as invalid_default_snippet, N as attr, O as pop_element, P as escape_html, Q as stringify } from "../../chunks/index2.js";
+import { a as auth, F as FirebaseApp, f as firestore, S as SignedIn } from "../../chunks/SignedOut.js";
 import { p as page } from "../../chunks/stores.js";
 import { g as goto } from "../../chunks/client.js";
 import "firebase/auth";
@@ -7,7 +7,7 @@ import "firebase/firestore";
 import "firebase/storage";
 import "firebase/analytics";
 import "firebase/database";
-import "../../chunks/ProgressBar.svelte_svelte_type_style_lang.js";
+import { A as Avatar } from "../../chunks/ProgressRadial.js";
 function normalizeColor(hexCode) {
   return [(hexCode >> 16 & 255) / 255, (hexCode >> 8 & 255) / 255, (255 & hexCode) / 255];
 }
@@ -473,101 +473,9 @@ class Gradient {
     this.sectionColors = this.sectionColors.filter(Boolean).map(normalizeColor);
   }
 }
-function FirebaseApp($$payload, $$props) {
-  push();
-  let firestore2 = fallback($$props["firestore"], () => void 0, true);
-  let rtdb = fallback($$props["rtdb"], () => void 0, true);
-  let auth2 = fallback($$props["auth"], () => void 0, true);
-  let storage = fallback($$props["storage"], () => void 0, true);
-  let analytics = fallback($$props["analytics"], () => void 0, true);
-  setFirebaseContext({ firestore: firestore2, rtdb, auth: auth2, storage, analytics });
-  $$payload.out += `<!---->`;
-  slot($$payload, $$props, "default", {});
-  $$payload.out += `<!---->`;
-  bind_props($$props, { firestore: firestore2, rtdb, auth: auth2, storage, analytics });
-  pop();
-}
-function Avatar($$payload, $$props) {
-  const $$sanitized_props = sanitize_props($$props);
-  const $$restProps = rest_props($$sanitized_props, [
-    "initials",
-    "fill",
-    "fontSize",
-    "src",
-    "fallback",
-    "action",
-    "actionParams",
-    "background",
-    "width",
-    "border",
-    "rounded",
-    "shadow",
-    "cursor"
-  ]);
-  push();
-  let classesBase;
-  let initials = fallback($$props["initials"], "");
-  let fill = fallback($$props["fill"], "fill-token");
-  let fontSize = fallback($$props["fontSize"], 150);
-  let src = fallback($$props["src"], "");
-  let fallback$1 = fallback($$props["fallback"], "");
-  let action = fallback($$props["action"], () => {
-  });
-  let actionParams = fallback($$props["actionParams"], "");
-  let background = fallback($$props["background"], "bg-surface-400-500-token");
-  let width = fallback($$props["width"], "w-16");
-  let border = fallback($$props["border"], "");
-  let rounded = fallback($$props["rounded"], "rounded-full");
-  let shadow = fallback($$props["shadow"], "");
-  let cursor = fallback($$props["cursor"], "");
-  let cBase = "flex aspect-square text-surface-50 font-semibold justify-center items-center overflow-hidden isolate";
-  let cImage = "w-full object-cover";
-  function prunedRestProps() {
-    delete $$restProps.class;
-    return $$restProps;
-  }
-  classesBase = `${cBase} ${background} ${width} ${border} ${rounded} ${shadow} ${cursor} ${$$sanitized_props.class ?? ""}`;
-  $$payload.out += `<figure${spread_attributes({
-    class: `avatar ${stringify(classesBase)}`,
-    "data-testid": "avatar",
-    ...prunedRestProps()
-  })}>`;
-  if (src || fallback$1) {
-    $$payload.out += "<!--[-->";
-    $$payload.out += `<img${attr("class", `avatar-image ${stringify(cImage)}`)}${attr("style", $$sanitized_props.style ?? "")}${attr("src", src)}${attr("alt", $$sanitized_props.alt || "")} onload="this.__e=event" onerror="this.__e=event">`;
-  } else {
-    $$payload.out += "<!--[!-->";
-    if (initials) {
-      $$payload.out += "<!--[-->";
-      $$payload.out += `<svg class="avatar-initials w-full h-full" viewBox="0 0 512 512"><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-weight="bold"${attr("font-size", fontSize)}${attr("class", `avatar-text ${stringify(fill)}`)}>${escape_html(String(initials).substring(0, 2).toUpperCase())}</text></svg>`;
-    } else {
-      $$payload.out += "<!--[!-->";
-      $$payload.out += `<!---->`;
-      slot($$payload, $$props, "default", {});
-      $$payload.out += `<!---->`;
-    }
-    $$payload.out += `<!--]-->`;
-  }
-  $$payload.out += `<!--]--></figure>`;
-  bind_props($$props, {
-    initials,
-    fill,
-    fontSize,
-    src,
-    fallback: fallback$1,
-    action,
-    actionParams,
-    background,
-    width,
-    border,
-    rounded,
-    shadow,
-    cursor
-  });
-  pop();
-}
+_layout[FILENAME] = "src/routes/+layout.svelte";
 function _layout($$payload, $$props) {
-  push();
+  push(_layout);
   var $$store_subs;
   let { children } = $$props;
   const gradient = new Gradient();
@@ -598,14 +506,19 @@ function _layout($$payload, $$props) {
     firestore,
     children: ($$payload2) => {
       $$payload2.out += `<div class="dream flex flex-col items-center w-full h-screen">`;
+      push_element($$payload2, "div", 67, 4);
       SignedIn($$payload2, {
         children: invalid_default_snippet,
         $$slots: {
           default: ($$payload3, { auth: auth2, signOut, user }) => {
             $$payload3.out += `<header${attr("class", `transition-all flex items-center ${stringify(headerClass)} w-full bg-surface-700 bg-opacity-70 drop-shadow-lg backdrop-blur-md`)}>`;
+            push_element($$payload3, "header", 69, 12);
             if (ready) {
               $$payload3.out += "<!--[-->";
-              $$payload3.out += `<div class="flex items-center justify-between flex-1"><div class="flex items-center">`;
+              $$payload3.out += `<div class="flex items-center justify-between flex-1">`;
+              push_element($$payload3, "div", 73, 20);
+              $$payload3.out += `<div class="flex items-center">`;
+              push_element($$payload3, "div", 74, 24);
               if (user.photoURL != null) {
                 $$payload3.out += "<!--[-->";
                 Avatar($$payload3, {
@@ -620,27 +533,61 @@ function _layout($$payload, $$props) {
               $$payload3.out += `<!--]--> `;
               if (user.displayName != null && !minimize) {
                 $$payload3.out += "<!--[-->";
-                $$payload3.out += `<div><span class="text-lg">Welcome</span><span class="text-lg font-bold pl-1">${escape_html(user.displayName)}</span></div>`;
+                $$payload3.out += `<div>`;
+                push_element($$payload3, "div", 84, 32);
+                $$payload3.out += `<span class="text-lg">`;
+                push_element($$payload3, "span", 85, 36);
+                $$payload3.out += `Welcome</span>`;
+                pop_element();
+                $$payload3.out += `<span class="text-lg font-bold pl-1">`;
+                push_element($$payload3, "span", 85, 73);
+                $$payload3.out += `${escape_html(user.displayName)}</span>`;
+                pop_element();
+                $$payload3.out += `</div>`;
+                pop_element();
               } else {
                 $$payload3.out += "<!--[!-->";
               }
-              $$payload3.out += `<!--]--></div> <button type="button" class="btn-icon variant-filled-primary"><span class="material-symbols-outlined">logout</span></button></div>`;
+              $$payload3.out += `<!--]--></div>`;
+              pop_element();
+              $$payload3.out += ` <button type="button" class="btn-icon variant-filled-primary">`;
+              push_element($$payload3, "button", 92, 24);
+              $$payload3.out += `<span class="material-symbols-outlined">`;
+              push_element($$payload3, "span", 97, 28);
+              $$payload3.out += `logout</span>`;
+              pop_element();
+              $$payload3.out += `</button>`;
+              pop_element();
+              $$payload3.out += `</div>`;
+              pop_element();
             } else {
               $$payload3.out += "<!--[!-->";
             }
             $$payload3.out += `<!--]--></header>`;
+            pop_element();
           }
         }
       });
       $$payload2.out += `<!----> <div class="flex flex-col items-center justify-center overflow-auto h-full w-full">`;
+      push_element($$payload2, "div", 105, 8);
       children($$payload2);
-      $$payload2.out += `<!----></div> <canvas class="fixed top-0 left-0 w-full h-full -z-10 mix-blend-plus-darker svelte-ciik6g" id="gradient-canvas" data-js-darken-top="" data-transition-in=""></canvas></div>`;
+      $$payload2.out += `<!----></div>`;
+      pop_element();
+      $$payload2.out += ` <canvas class="fixed top-0 left-0 w-full h-full -z-10 mix-blend-plus-darker svelte-ciik6g" id="gradient-canvas" data-js-darken-top="" data-transition-in="">`;
+      push_element($$payload2, "canvas", 111, 8);
+      $$payload2.out += `</canvas>`;
+      pop_element();
+      $$payload2.out += `</div>`;
+      pop_element();
     },
     $$slots: { default: true }
   });
   if ($$store_subs) unsubscribe_stores($$store_subs);
   pop();
 }
+_layout.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
 export {
   _layout as default
 };

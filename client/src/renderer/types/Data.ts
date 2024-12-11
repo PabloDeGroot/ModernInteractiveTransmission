@@ -44,7 +44,7 @@ export class ClickInput extends MouseInput {
         this.pressed = pressed
     }
     Run = () => {
-        if (!this.pressed) {
+        if (this.pressed) {
             //this.IPC.send("clickMouse", { x: this.x, y: this.y, type: this.button })
             this.MouseDown(this.button)
         }else{

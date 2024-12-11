@@ -3,8 +3,13 @@ import { electronAPI } from '@electron-toolkit/preload'
 
 // Custom APIs for renderer
 const api = {
-
-
+  
+  onClearAll(func: () => void) {
+    ipcRenderer.on('clearAll', (e)=>{
+      func();
+      console.log("preload: clearAll");
+    });
+  },
 
   //ipcMain.on('clickMouse', async (event, arg) => {
   clickMouse(x: number, y: number, type: string) {

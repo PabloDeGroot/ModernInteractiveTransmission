@@ -1,14 +1,14 @@
-import { a4 as sanitize_slots, T as fallback, Z as attr, a5 as add_styles, V as slot, W as bind_props, S as pop, a0 as sanitize_props, _ as stringify, Q as push, a6 as ensure_array_like, a3 as invalid_default_snippet, a1 as store_get, a2 as unsubscribe_stores } from "../../../chunks/index2.js";
+import { F as FILENAME, C as push, K as push_element, O as pop_element, R as bind_props, G as pop, S as spread_attributes, N as attr, T as copy_payload, U as assign_payload, V as ensure_array_like, M as invalid_default_snippet, I as store_get, J as unsubscribe_stores } from "../../../chunks/index2.js";
 import { p as page } from "../../../chunks/stores.js";
-import { f as firestore, a as auth, S as SignedIn } from "../../../chunks/SignedIn.js";
+import { f as firestore, a as auth, S as SignedIn } from "../../../chunks/SignedOut.js";
 import "firebase/auth";
-import { doc, collection, onSnapshot, setDoc, arrayUnion } from "firebase/firestore";
+import { collection, onSnapshot, doc, setDoc, arrayUnion } from "firebase/firestore";
 import "firebase/storage";
 import "firebase/analytics";
 import "firebase/database";
 import { w as writable } from "../../../chunks/index.js";
 import "firebase/compat/app";
-import "../../../chunks/ProgressBar.svelte_svelte_type_style_lang.js";
+import { P as ProgressRadial } from "../../../chunks/ProgressRadial.js";
 import "../../../chunks/client.js";
 function docStore(firestore2, ref, startWith) {
   let unsubscribe;
@@ -74,61 +74,6 @@ function collectionStore(firestore2, ref, startWith = []) {
     ref: colRef
   };
 }
-function ProgressRadial($$payload, $$props) {
-  const $$slots = sanitize_slots($$props);
-  const $$sanitized_props = sanitize_props($$props);
-  push();
-  let classesBase;
-  let value = fallback($$props["value"], () => void 0, true);
-  let stroke = fallback($$props["stroke"], 40);
-  let font = fallback($$props["font"], 56);
-  let strokeLinecap = fallback($$props["strokeLinecap"], "butt");
-  let transition = fallback($$props["transition"], "transition-[stroke-dashoffset]");
-  let width = fallback($$props["width"], "w-36");
-  let meter = fallback($$props["meter"], "stroke-surface-900 dark:stroke-surface-50");
-  let track = fallback($$props["track"], "stroke-surface-500/30");
-  let fill = fallback($$props["fill"], "fill-token");
-  let labelledby = fallback($$props["labelledby"], "");
-  const cBase = "progress-radial relative overflow-hidden";
-  const cBaseTrack = "fill-transparent";
-  const cBaseMeter = "fill-transparent -rotate-90 origin-[50%_50%]";
-  const baseSize = 512;
-  const radius = baseSize / 2 - stroke / 2;
-  let circumference = radius;
-  let dashoffset;
-  function setProgress(percent) {
-    circumference = radius * 2 * Math.PI;
-    dashoffset = circumference - percent / 100 * circumference;
-  }
-  setProgress(0);
-  classesBase = `${cBase} ${width} ${$$sanitized_props.class ?? ""}`;
-  $$payload.out += `<figure${attr("class", `progress-radial ${stringify(classesBase)}`)} data-testid="progress-radial" role="meter"${attr("aria-labelledby", labelledby)}${attr("aria-valuenow", value || 0)}${attr("aria-valuetext", value ? `${value}%` : "Indeterminate Spinner")}${attr("aria-valuemin", 0)}${attr("aria-valuemax", 100)}><svg${attr("viewBox", `0 0 ${stringify(baseSize)} ${stringify(baseSize)}`)}${attr("class", `rounded-full ${stringify([value === void 0 ? "animate-spin" : ""].filter(Boolean).join(" "))}`)}><circle${attr("class", `progress-radial-track ${stringify(cBaseTrack)} ${stringify(track)}`)}${attr("stroke-width", stroke)}${attr("r", radius)} cx="50%" cy="50%"></circle><circle${add_styles({
-    "stroke-dasharray": `${stringify(circumference)} ${stringify(circumference)}`,
-    "stroke-dashoffset": dashoffset
-  })}${attr("class", `progress-radial-meter ${stringify(cBaseMeter)} ${stringify(meter)} ${stringify(transition)}`)}${attr("stroke-width", stroke)}${attr("r", radius)} cx="50%" cy="50%"${attr("stroke-linecap", strokeLinecap)}></circle>`;
-  if (value != void 0 && value >= 0 && $$slots.default) {
-    $$payload.out += "<!--[-->";
-    $$payload.out += `<text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" font-weight="bold"${attr("font-size", font)}${attr("class", `progress-radial-text ${stringify(fill)}`)}><!---->`;
-    slot($$payload, $$props, "default", {});
-    $$payload.out += `<!----></text>`;
-  } else {
-    $$payload.out += "<!--[!-->";
-  }
-  $$payload.out += `<!--]--></svg></figure>`;
-  bind_props($$props, {
-    value,
-    stroke,
-    font,
-    strokeLinecap,
-    transition,
-    width,
-    meter,
-    track,
-    fill,
-    labelledby
-  });
-  pop();
-}
 function GetRoom(id) {
   return docStore(firestore, "room/" + id);
 }
@@ -144,8 +89,9 @@ function AddUser(ref, user) {
     );
   }
 }
+Dream[FILENAME] = "src/lib/Components/Dream.svelte";
 function Dream($$payload, $$props) {
-  push();
+  push(Dream);
   let {
     stream,
     mouseMove = void 0,
@@ -154,16 +100,199 @@ function Dream($$payload, $$props) {
     mouseWheel = void 0
   } = $$props;
   !navigator.userActivation.isActive;
-  $$payload.out += `<div class="rounded h-full overflow-hidden flex"><video class="max-h-full" autoplay></video> `;
+  $$payload.out += `<div class="rounded h-full overflow-hidden flex items-center">`;
+  push_element($$payload, "div", 44, 0);
+  $$payload.out += `<video class="max-h-full h-fit" autoplay>`;
+  push_element($$payload, "video", 46, 4);
+  $$payload.out += `</video>`;
+  pop_element();
+  $$payload.out += ` `;
   {
     $$payload.out += "<!--[!-->";
   }
   $$payload.out += `<!--]--></div>`;
+  pop_element();
   bind_props($$props, { mouseMove, mouseDown, mouseUp, mouseWheel });
   pop();
 }
+Dream.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
+Cursor[FILENAME] = "~icons/vaadin/cursor.svelte";
+function Cursor($$payload, $$props) {
+  push(Cursor);
+  const { $$slots, $$events, ...p } = $$props;
+  $$payload.out += `<svg${spread_attributes(
+    {
+      viewBox: "0 0 16 16",
+      width: "1.2em",
+      height: "1.2em",
+      ...p
+    },
+    void 0,
+    void 0,
+    3
+  )}>`;
+  push_element($$payload, "svg", 1, 37);
+  $$payload.out += `<path fill="currentColor" d="M4 0v13l3.31-3.47L10 16l1.37-.63L8.65 9H13z">`;
+  push_element($$payload, "path", 1, 99);
+  $$payload.out += `</path>`;
+  pop_element();
+  $$payload.out += `</svg>`;
+  pop_element();
+  pop();
+}
+Cursor.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
+Click[FILENAME] = "src/lib/Components/Toolbar/Items/Click.svelte";
+function Click($$payload, $$props) {
+  push(Click);
+  let { active = void 0 } = $$props;
+  let activeClass = "border-2 border-slate-900 !bg-opacity-0";
+  $$payload.out += `<button type="button"${attr("class", activeClass)}>`;
+  push_element($$payload, "button", 19, 0);
+  Cursor($$payload, {});
+  $$payload.out += `<!----></button>`;
+  pop_element();
+  bind_props($$props, { active });
+  pop();
+}
+Click.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
+Rubber[FILENAME] = "~icons/jam/rubber.svelte";
+function Rubber($$payload, $$props) {
+  push(Rubber);
+  const { $$slots, $$events, ...p } = $$props;
+  $$payload.out += `<svg${spread_attributes(
+    {
+      viewBox: "-1.5 -2.5 24 24",
+      width: "1.2em",
+      height: "1.2em",
+      ...p
+    },
+    void 0,
+    void 0,
+    3
+  )}>`;
+  push_element($$payload, "svg", 1, 37);
+  $$payload.out += `<path fill="currentColor" d="M12.728 12.728L8.485 8.485l-5.657 5.657l2.122 2.121a3 3 0 0 0 4.242 0zM11.284 17H14a1 1 0 0 1 0 2H3a1 1 0 0 1-.133-1.991l-1.453-1.453a2 2 0 0 1 0-2.828L12.728 1.414a2 2 0 0 1 2.828 0L19.8 5.657a2 2 0 0 1 0 2.828z">`;
+  push_element($$payload, "path", 1, 105);
+  $$payload.out += `</path>`;
+  pop_element();
+  $$payload.out += `</svg>`;
+  pop_element();
+  pop();
+}
+Rubber.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
+Pencil[FILENAME] = "~icons/bxs/pencil.svelte";
+function Pencil($$payload, $$props) {
+  push(Pencil);
+  const { $$slots, $$events, ...p } = $$props;
+  $$payload.out += `<svg${spread_attributes(
+    {
+      viewBox: "0 0 24 24",
+      width: "1.2em",
+      height: "1.2em",
+      ...p
+    },
+    void 0,
+    void 0,
+    3
+  )}>`;
+  push_element($$payload, "svg", 1, 37);
+  $$payload.out += `<path fill="currentColor" d="M8.707 19.707L18 10.414L13.586 6l-9.293 9.293a1 1 0 0 0-.263.464L3 21l5.242-1.03c.176-.044.337-.135.465-.263M21 7.414a2 2 0 0 0 0-2.828L19.414 3a2 2 0 0 0-2.828 0L15 4.586L19.414 9z">`;
+  push_element($$payload, "path", 1, 99);
+  $$payload.out += `</path>`;
+  pop_element();
+  $$payload.out += `</svg>`;
+  pop_element();
+  pop();
+}
+Pencil.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
+Draw[FILENAME] = "src/lib/Components/Toolbar/Items/Draw.svelte";
+function Draw($$payload, $$props) {
+  push(Draw);
+  let { active = false, isPencil = true } = $$props;
+  let activeClass = "border-2 border-slate-900 !bg-opacity-0";
+  $$payload.out += `<button type="button"${attr("class", activeClass)}>`;
+  push_element($$payload, "button", 37, 0);
+  if (isPencil) {
+    $$payload.out += "<!--[-->";
+    Pencil($$payload, {});
+  } else {
+    $$payload.out += "<!--[!-->";
+    Rubber($$payload, {});
+  }
+  $$payload.out += `<!--]--></button>`;
+  pop_element();
+  bind_props($$props, { active, isPencil });
+  pop();
+}
+Draw.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
+Toolbar[FILENAME] = "src/lib/Components/Toolbar/Toolbar.svelte";
+function Toolbar($$payload, $$props) {
+  push(Toolbar);
+  let { selectedTool = "click" } = $$props;
+  let clickActive = true;
+  let drawActive = false;
+  let drawPencil = true;
+  let $$settled = true;
+  let $$inner_payload;
+  function $$render_inner($$payload2) {
+    $$payload2.out += `<div class="flex flex-col mr-2 p-1 bg-surface-50 bg-opacity-30 border rounded backdrop-blur-3xl">`;
+    push_element($$payload2, "div", 32, 0);
+    Click($$payload2, {
+      get active() {
+        return clickActive;
+      },
+      set active($$value) {
+        clickActive = $$value;
+        $$settled = false;
+      }
+    });
+    $$payload2.out += `<!----> `;
+    Draw($$payload2, {
+      get active() {
+        return drawActive;
+      },
+      set active($$value) {
+        drawActive = $$value;
+        $$settled = false;
+      },
+      get isPencil() {
+        return drawPencil;
+      },
+      set isPencil($$value) {
+        drawPencil = $$value;
+        $$settled = false;
+      }
+    });
+    $$payload2.out += `<!----></div>`;
+    pop_element();
+  }
+  do {
+    $$settled = true;
+    $$inner_payload = copy_payload($$payload);
+    $$render_inner($$inner_payload);
+  } while (!$$settled);
+  assign_payload($$payload, $$inner_payload);
+  bind_props($$props, { selectedTool });
+  pop();
+}
+Toolbar.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
+DreamConnection[FILENAME] = "src/lib/Components/DreamConnection.svelte";
 function DreamConnection($$payload, $$props) {
-  push();
+  push(DreamConnection);
   let { call, localStream, remove = void 0 } = $$props;
   let media = null;
   call.pc.ontrack = (e) => {
@@ -183,26 +312,41 @@ function DreamConnection($$payload, $$props) {
       call.data.send(JSON.stringify(data));
     }
   };
-  let OnClick = (e) => {
-    let btn = "left";
-    if (e.button == 1) btn = "middle";
-    if (e.button == 2) btn = "right";
+  let selectedTool = "click";
+  let MouseDown = (e) => {
     let data = {
       type: "BasicInput",
       device: "mouse",
       action: "click",
-      button: btn,
+      button: e.button == 1 ? "middle" : e.button == 2 ? "right" : "left",
+      pressed: true,
       x: e.offsetX / e.target.clientWidth,
       y: e.offsetY / e.target.clientHeight
     };
     sendData(data);
-    console.log("DreamConnection: Clicked");
+    console.log("DreamConnection: Mouse down");
+  };
+  let MouseUp = (e) => {
+    let data = {
+      type: "BasicInput",
+      device: "mouse",
+      action: "click",
+      button: e.button == 1 ? "middle" : e.button == 2 ? "right" : "left",
+      pressed: false,
+      x: e.offsetX / e.target.clientWidth,
+      y: e.offsetY / e.target.clientHeight
+    };
+    sendData(data);
+    console.log("DreamConnection: Mouse up");
   };
   let MouseMove = (e) => {
     let data = {
       type: "BasicInput",
       device: "mouse",
       action: "move",
+      selectedTool,
+      //action: "ck",
+      erase: false,
       x: e.offsetX / e.target.clientWidth,
       y: e.offsetY / e.target.clientHeight
     };
@@ -229,30 +373,53 @@ function DreamConnection($$payload, $$props) {
       type: "BasicInput",
       device: "keyboard",
       action: down ? "press" : "release",
-      key: e.key
+      key: e.code
     };
     sendData(data);
     console.log("DreamConnection: Key pressed");
   }
-  if (media != null) {
-    $$payload.out += "<!--[-->";
-    Dream($$payload, {
-      interarctive: false,
-      stream: media,
-      local: false,
-      mouseMove: MouseMove,
-      mouseDown: () => {
-      },
-      mouseUp: OnClick,
-      mouseWheel: Scroll
-    });
-  } else {
-    $$payload.out += "<!--[!-->";
+  let $$settled = true;
+  let $$inner_payload;
+  function $$render_inner($$payload2) {
+    if (media != null) {
+      $$payload2.out += "<!--[-->";
+      Toolbar($$payload2, {
+        get selectedTool() {
+          return selectedTool;
+        },
+        set selectedTool($$value) {
+          selectedTool = $$value;
+          $$settled = false;
+        }
+      });
+      $$payload2.out += `<!----> `;
+      Dream($$payload2, {
+        interarctive: false,
+        stream: media,
+        local: false,
+        mouseMove: MouseMove,
+        mouseDown: MouseDown,
+        mouseUp: MouseUp,
+        mouseWheel: Scroll
+      });
+      $$payload2.out += `<!---->`;
+    } else {
+      $$payload2.out += "<!--[!-->";
+    }
+    $$payload2.out += `<!--]-->`;
   }
-  $$payload.out += `<!--]-->`;
+  do {
+    $$settled = true;
+    $$inner_payload = copy_payload($$payload);
+    $$render_inner($$inner_payload);
+  } while (!$$settled);
+  assign_payload($$payload, $$inner_payload);
   bind_props($$props, { remove, KeyEvent });
   pop();
 }
+DreamConnection.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
 class FirestoreSignalingChannel {
   roomID;
   readRef;
@@ -605,8 +772,9 @@ class FirestoreCallChannel {
   onCall;
   onConnection;
 }
+Room[FILENAME] = "src/lib/Components/Room.svelte";
 function Room($$payload, $$props) {
-  push();
+  push(Room);
   var uid = auth.currentUser?.uid;
   var name = auth.currentUser?.displayName;
   let { firebaseUser, roomId, color = "red" } = $$props;
@@ -653,38 +821,68 @@ function Room($$payload, $$props) {
   window.onkeyup = (e) => {
     console.log("Room: Key released", e);
   };
-  $$payload.out += `<div class="flex flex-col items-center justify-center w-full h-full"><div class="flex-1 h-full"><div class="main-dream h-full flex justify-center">`;
+  $$payload.out += `<div class="flex flex-col items-center justify-center w-full h-full">`;
+  push_element($$payload, "div", 219, 0);
+  $$payload.out += `<div class="flex-1 h-full">`;
+  push_element($$payload, "div", 220, 4);
+  $$payload.out += `<div class="main-dream h-full flex justify-center">`;
+  push_element($$payload, "div", 221, 8);
   if (connections.length == 0) {
     $$payload.out += "<!--[-->";
-    $$payload.out += `<p class="self-center">Waiting for someone to start sharing...</p>`;
+    $$payload.out += `<p class="self-center">`;
+    push_element($$payload, "p", 223, 16);
+    $$payload.out += `Waiting for someone to start sharing...</p>`;
+    pop_element();
   } else {
     $$payload.out += "<!--[!-->";
     DreamConnection($$payload, { call: connections[0], localStream });
   }
-  $$payload.out += `<!--]--></div> `;
+  $$payload.out += `<!--]--></div>`;
+  pop_element();
+  $$payload.out += ` `;
   if (connections.length > 1) {
     $$payload.out += "<!--[-->";
     const each_array = ensure_array_like(connections.slice(1));
-    $$payload.out += `<div class="other-dreams"><!--[-->`;
+    $$payload.out += `<div class="other-dreams">`;
+    push_element($$payload, "div", 235, 12);
+    $$payload.out += `<!--[-->`;
     for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
       let stream = each_array[$$index];
-      $$payload.out += `<p>dsada</p> <button>`;
+      $$payload.out += `<p>`;
+      push_element($$payload, "p", 237, 20);
+      $$payload.out += `dsada</p>`;
+      pop_element();
+      $$payload.out += ` <button>`;
+      push_element($$payload, "button", 238, 20);
       DreamConnection($$payload, { call: stream, localStream });
       $$payload.out += `<!----></button>`;
+      pop_element();
     }
     $$payload.out += `<!--]--></div>`;
+    pop_element();
   } else {
     $$payload.out += "<!--[!-->";
   }
-  $$payload.out += `<!--]--></div> <div class="flex items-center justify-center w-full mb-3 absolute bottom-0"><button class="btn variant-filled-secondary mr-4">Share</button> <button class="btn variant-filled-secondary">Share with App</button></div></div>`;
+  $$payload.out += `<!--]--></div>`;
+  pop_element();
+  $$payload.out += `</div>`;
+  pop_element();
   pop();
 }
+Room.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
+EnsureLogin[FILENAME] = "src/lib/Components/EnsureLogin.svelte";
 function EnsureLogin($$payload, $$props) {
-  push();
+  push(EnsureLogin);
   pop();
 }
+EnsureLogin.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
+_page[FILENAME] = "src/routes/[slug]/+page.svelte";
 function _page($$payload, $$props) {
-  push();
+  push(_page);
   var $$store_subs;
   let ready = false;
   auth.authStateReady().then(() => {
@@ -708,13 +906,19 @@ function _page($$payload, $$props) {
       children: invalid_default_snippet,
       $$slots: {
         default: ($$payload2, { user }) => {
-          $$payload2.out += `<div class="card variant-ghost-primary -backdrop-hue-rotate-90 backdrop-blur-md flex flex-col items-center p-2 room svelte-l1jl19"><div class="card-content h-full flex-1 flex flex-col items-center">`;
+          $$payload2.out += `<div class="card variant-ghost-primary -backdrop-hue-rotate-90 backdrop-blur-md flex flex-col items-center p-2 room m-2 svelte-l1jl19">`;
+          push_element($$payload2, "div", 27, 8);
+          $$payload2.out += `<div class="card-content h-full flex-1 flex flex-col items-center">`;
+          push_element($$payload2, "div", 30, 12);
           Room($$payload2, {
             firebaseUser: user,
             roomId: store_get($$store_subs ??= {}, "$page", page).params.slug,
             color
           });
-          $$payload2.out += `<!----></div></div>`;
+          $$payload2.out += `<!----></div>`;
+          pop_element();
+          $$payload2.out += `</div>`;
+          pop_element();
         }
       }
     });
@@ -726,6 +930,9 @@ function _page($$payload, $$props) {
   if ($$store_subs) unsubscribe_stores($$store_subs);
   pop();
 }
+_page.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
 export {
   _page as default
 };

@@ -247,7 +247,7 @@
             </div>
         {/if}
     </div>
-
+        <!--
         <div
             class="flex items-center justify-center w-full mb-3 absolute bottom-0"
         >
@@ -263,4 +263,5 @@
             >
             <button class="btn variant-filled-secondary">Share with App</button>
         </div>
+        -->
 </div>

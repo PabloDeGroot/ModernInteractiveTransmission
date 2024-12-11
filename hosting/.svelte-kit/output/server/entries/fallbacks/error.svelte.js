@@ -1,12 +1,23 @@
-import { $ as escape_html, a1 as store_get, a2 as unsubscribe_stores, S as pop, Q as push } from "../../chunks/index2.js";
+import { F as FILENAME, C as push, K as push_element, P as escape_html, I as store_get, O as pop_element, J as unsubscribe_stores, G as pop } from "../../chunks/index2.js";
 import { p as page } from "../../chunks/stores.js";
+Error[FILENAME] = "node_modules/@sveltejs/kit/src/runtime/components/svelte-5/error.svelte";
 function Error($$payload, $$props) {
-  push();
+  push(Error);
   var $$store_subs;
-  $$payload.out += `<h1>${escape_html(store_get($$store_subs ??= {}, "$page", page).status)}</h1> <p>${escape_html(store_get($$store_subs ??= {}, "$page", page).error?.message)}</p>`;
+  $$payload.out += `<h1>`;
+  push_element($$payload, "h1", 5, 0);
+  $$payload.out += `${escape_html(store_get($$store_subs ??= {}, "$page", page).status)}</h1>`;
+  pop_element();
+  $$payload.out += ` <p>`;
+  push_element($$payload, "p", 6, 0);
+  $$payload.out += `${escape_html(store_get($$store_subs ??= {}, "$page", page).error?.message)}</p>`;
+  pop_element();
   if ($$store_subs) unsubscribe_stores($$store_subs);
   pop();
 }
+Error.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
 export {
   Error as default
 };

@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, session, desktopCapturer, Tray, Menu } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, session, desktopCapturer, Tray, Menu, globalShortcut, ipcRenderer } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -6,8 +6,10 @@ import { screen } from 'electron'
 import MenuBuilder from './menu'
 import { Button, mouse, keyboard, KeyboardClass, Key } from "@nut-tree-fork/nut-js"
 import { k } from 'vite/dist/node/types.d-aGj9QkWt'
+import { on } from 'events'
 const path = require('path')
-
+let mainWindow: BrowserWindow | null = null
+let onMainWindow: ((mainWindow: BrowserWindow) => void) | null = null;
 let room = "room1";
 let user = "app_OFppzHR7PuVlmdY723qUKDh1B6A2";
 function createWindow(): void {
@@ -35,15 +37,15 @@ function createWindow(): void {
       sandbox: false
     }
   })
-
-  //mainWindow.setAlwaysOnTop(true);
-  mainWindow.setIgnoreMouseEvents(true);
-
-  mainWindow.setFullScreenable(false);
-  //mainWindow.setKiosk(true);
-  //mainWindow.setMenu(null);
-  //mainWindow.setMovable(false);
-  //mainWindow.setFocusable(false);
+  /*
+    mainWindow.setAlwaysOnTop(true);
+    mainWindow.setIgnoreMouseEvents(true);
+    mainWindow.setFullScreenable(false);
+    mainWindow.setKiosk(true);
+    mainWindow.setMenu(null);
+    mainWindow.setMovable(false);
+    mainWindow.setFocusable(false);
+  */
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
@@ -64,6 +66,8 @@ function createWindow(): void {
   const menuBuilder = new MenuBuilder(mainWindow);
   menuBuilder.buildMenu();
 
+  if (onMainWindow != null) { onMainWindow(mainWindow) };
+
 }
 
 
@@ -71,20 +75,33 @@ function createWindow(): void {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
+
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
 
-    desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
-      // Grant access to the first screen found.
-      callback({ video: sources[0], audio: 'loopback' })
+    if (!request.audioRequested) {
+      desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
 
-    })
+        // Grant access to the first screen found.
+        callback({ video: sources[0], audio: 'loopback' })
+
+      })
+    } else {
+      desktopCapturer.getSources({ types: ['window'] }).then((sources) => {
+        // Grant access to the first screen found.
+        sources = sources.filter(source => source.name.includes("Opera"));
+        sources.forEach(source => console.log(source.name));
+        callback({ video: sources[0], audio: 'loopback' })
+
+      })
+    }
     // If true, use the system picker if available.
     // Note: this is currently experimental. If the system picker
     // is available, it will be used and the media request handler
     // will not be invoked.
   })
+
 
 
   // Default open or close DevTools by F12 in development
@@ -93,10 +110,19 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
+  onMainWindow = (mainWindow) => {
+    console.log("onMainWindow");
+    //optimizer.watchWindowShortcuts(mainWindow)
+    globalShortcut.register("CommandOrControl+F1", () => {
+      console.log("Clearing All...");
+      mainWindow.webContents.send("clearAll");
+    });
+
+  }
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
-  ipcMain.on("clickMouse", async (event, arg) => {
+  ipcMain.on("click", async (event, arg) => {
     console.log("clickMouse");
     console.log(arg);
 
@@ -199,6 +225,7 @@ app.whenReady().then(() => {
 
     let keycode = Key[key as keyof KeyboardClass];
     console.log(arg);
+
     console.log(keycode);
     if (arg.pressed) {
       keyboard.pressKey(keycode);

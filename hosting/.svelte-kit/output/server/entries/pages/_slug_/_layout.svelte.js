@@ -1,13 +1,14 @@
-import { S as pop, Q as push, a1 as store_get, a2 as unsubscribe_stores } from "../../../chunks/index2.js";
+import { F as FILENAME, C as push, G as pop, I as store_get, J as unsubscribe_stores } from "../../../chunks/index2.js";
 import { p as page } from "../../../chunks/stores.js";
 import { ref, serverTimestamp, onValue, onDisconnect, set } from "firebase/database";
-import { a as auth, d as database, S as SignedIn } from "../../../chunks/SignedIn.js";
+import { a as auth, d as database, S as SignedIn } from "../../../chunks/SignedOut.js";
 import "firebase/auth";
 import "firebase/firestore";
 import "firebase/storage";
 import "firebase/analytics";
+Presence[FILENAME] = "src/lib/Components/Presence.svelte";
 function Presence($$payload, $$props) {
-  push();
+  push(Presence);
   var uid = auth.currentUser?.uid;
   let { roomID } = $$props;
   var userStatusDatabaseRef = ref(database, "/status/" + uid);
@@ -30,8 +31,12 @@ function Presence($$payload, $$props) {
   });
   pop();
 }
+Presence.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
+_layout[FILENAME] = "src/routes/[slug]/+layout.svelte";
 function _layout($$payload, $$props) {
-  push();
+  push(_layout);
   var $$store_subs;
   let { children } = $$props;
   let roomId = store_get($$store_subs ??= {}, "$page", page).params.slug;
@@ -47,6 +52,9 @@ function _layout($$payload, $$props) {
   if ($$store_subs) unsubscribe_stores($$store_subs);
   pop();
 }
+_layout.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
 export {
   _layout as default
 };

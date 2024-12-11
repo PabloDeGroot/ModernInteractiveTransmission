@@ -27,7 +27,7 @@
         if(videoSource == null) return;
         if(done) return;
         done = true;
-        videoSource.muted = muted;
+        //videoSource.muted = muted;
         videoSource.srcObject = stream;
 
         try {

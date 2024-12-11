@@ -1,5 +1,4 @@
-import { a as active_reaction, i as is_runes, b as DERIVED, B as BLOCK_EFFECT, d as derived_sources, s as state_unsafe_mutation, c as increment_version, e as DIRTY, f as set_signal_status, C as CLEAN, U as UNOWNED, g as schedule_effect, M as MAYBE_DIRTY, h as active_effect, j as BRANCH_EFFECT, n as new_deps, u as untracked_writes, k as set_untracked_writes, H as HYDRATION_ERROR, l as get_next_sibling, m as define_property, o as set_active_reaction, p as set_active_effect, q as is_array, r as init_operations, t as get_first_child, v as HYDRATION_START, w as HYDRATION_END, x as hydration_failed, y as clear_text_content, z as array_from, A as effect_root, E as is_passive_event, F as create_text, G as branch, I as push, J as pop, K as component_context, L as get, N as LEGACY_PROPS, O as flush_sync, P as render, Q as push$1, R as setContext, S as pop$1 } from "./index2.js";
-import { s as safe_equals, e as equals } from "./equality.js";
+import { h as hydration_mismatch, H as HYDRATION_ERROR, g as get_next_sibling, d as define_property, s as set_active_reaction, a as set_active_effect, i as is_array, b as active_reaction, c as active_effect, e as init_operations, f as get_first_child, j as HYDRATION_START, k as HYDRATION_END, l as hydration_failed, m as clear_text_content, n as array_from, o as effect_root, p as lifecycle_double_unmount, q as is_passive_event, r as create_text, t as branch, u as push, v as pop, w as component_context, x as get, L as LEGACY_PROPS, y as set, z as flush_sync, A as mutable_source, B as render, F as FILENAME, C as push$1, E as setContext, G as pop$1 } from "./index2.js";
 let base = "";
 let assets = base;
 const initial = { base, assets };
@@ -23,82 +22,6 @@ function set_public_env(environment) {
 }
 function set_safe_public_env(environment) {
   safe_public_env = environment;
-}
-function source(v) {
-  return {
-    f: 0,
-    // TODO ideally we could skip this altogether, but it causes type errors
-    v,
-    reactions: null,
-    equals,
-    version: 0
-  };
-}
-// @__NO_SIDE_EFFECTS__
-function mutable_source(initial_value, immutable = false) {
-  const s = source(initial_value);
-  if (!immutable) {
-    s.equals = safe_equals;
-  }
-  return s;
-}
-function set(source2, value) {
-  if (active_reaction !== null && is_runes() && (active_reaction.f & (DERIVED | BLOCK_EFFECT)) !== 0 && // If the source was created locally within the current derived, then
-  // we allow the mutation.
-  (derived_sources === null || !derived_sources.includes(source2))) {
-    state_unsafe_mutation();
-  }
-  return internal_set(source2, value);
-}
-function internal_set(source2, value) {
-  if (!source2.equals(value)) {
-    source2.v = value;
-    source2.version = increment_version();
-    mark_reactions(source2, DIRTY);
-    if (active_effect !== null && (active_effect.f & CLEAN) !== 0 && (active_effect.f & BRANCH_EFFECT) === 0) {
-      if (new_deps !== null && new_deps.includes(source2)) {
-        set_signal_status(active_effect, DIRTY);
-        schedule_effect(active_effect);
-      } else {
-        if (untracked_writes === null) {
-          set_untracked_writes([source2]);
-        } else {
-          untracked_writes.push(source2);
-        }
-      }
-    }
-  }
-  return value;
-}
-function mark_reactions(signal, status) {
-  var reactions = signal.reactions;
-  if (reactions === null) return;
-  var length = reactions.length;
-  for (var i = 0; i < length; i++) {
-    var reaction = reactions[i];
-    var flags = reaction.f;
-    if ((flags & DIRTY) !== 0) continue;
-    set_signal_status(reaction, status);
-    if ((flags & (CLEAN | UNOWNED)) !== 0) {
-      if ((flags & DERIVED) !== 0) {
-        mark_reactions(
-          /** @type {Derived} */
-          reaction,
-          MAYBE_DIRTY
-        );
-      } else {
-        schedule_effect(
-          /** @type {Effect} */
-          reaction
-        );
-      }
-    }
-  }
-}
-function hydration_mismatch(location) {
-  {
-    console.warn("hydration_mismatch");
-  }
 }
 let hydrating = false;
 function set_hydrating(value) {
@@ -352,6 +275,8 @@ function unmount(component) {
   const fn = mounted_components.get(component);
   if (fn) {
     fn();
+  } else {
+    lifecycle_double_unmount();
   }
 }
 function asClassComponent$1(component) {
@@ -378,7 +303,7 @@ class Svelte4Component {
   constructor(options2) {
     var sources = /* @__PURE__ */ new Map();
     var add_source = (key, value) => {
-      var s = /* @__PURE__ */ mutable_source(value);
+      var s = mutable_source(value);
       sources.set(key, s);
       return s;
     };
@@ -481,8 +406,9 @@ function set_building() {
 function set_prerendering() {
   prerendering = true;
 }
+Root[FILENAME] = ".svelte-kit/generated/root.svelte";
 function Root($$payload, $$props) {
-  push$1();
+  push$1(Root);
   let {
     stores,
     page,
@@ -549,6 +475,9 @@ function Root($$payload, $$props) {
   $$payload.out += `<!--]-->`;
   pop$1();
 }
+Root.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
 const root = asClassComponent(Root);
 const options = {
   app_dir: "_app",
@@ -636,7 +565,7 @@ const options = {
 		<div class="error">
 			<span class="status">` + status + '</span>\n			<div class="message">\n				<h1>' + message + "</h1>\n			</div>\n		</div>\n	</body>\n</html>\n"
   },
-  version_hash: "1gm2lci"
+  version_hash: "197f903"
 };
 async function get_hooks() {
   return {};

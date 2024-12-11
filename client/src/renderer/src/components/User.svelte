@@ -7,6 +7,7 @@
   interface UserProps {
     connection: MyPeerConnection
     localStream: MediaStream
+    audio: MediaStream
     draw: (
       lastPos: { x: number; y: number },
       x: number,
@@ -16,11 +17,8 @@
     ) => void
   }
   let lastPosDraw = $state<{ x: number; y: number } | null>(null)
-  let selectedTool = $state<'draw' | 'click'>('click')
+  let selectedTool = $state<'draw' | 'rubber' | 'click'>('click')
   let pressedMouse = $state(false)
-
-
-
 
   let { connection, localStream, draw }: UserProps = $props()
   let posX = $state(0)
@@ -32,29 +30,36 @@
     localStream.getTracks().forEach((track) => {
       connection.pc.addTrack(track, localStream)
     })
+    connection.pc.getSenders().forEach((sender) => {
+      console.log('Sender', sender)
+      if (sender.track != null) {
+        console.log('Sender Track', sender.track)
+      }
+    })
   })
-  let SetPosition = (x: number, y: number, selectedTool: string) => {
+  let SetPosition = (x: number, y: number, tool: 'draw' | 'rubber' | 'click') => {
     posX = x
     posY = y
-    selectedTool = selectedTool
-    if(selectedTool == 'draw') {
-      if(pressedMouse) {
-        Draw(x, y, 'draw')
+    selectedTool = tool
+    if (tool == 'draw' || tool == 'rubber') {
+      if (pressedMouse) {
+        Draw(x, y, tool)
       }
     }
   }
-  let MouseUp = (button:string) => {
-    pressedMouse = false;
-    //lastPosDraw = null;
-    if(selectedTool == "click"){
-      electronIpc.send('click', {x: posX, y: posY, button: button})
-    }if(selectedTool == "draw"){
-      lastPosDraw = null;
+  let MouseUp = (button: string) => {
+    pressedMouse = false
+    lastPosDraw = null
+    if (selectedTool == 'click') {
+      electronIpc.send('click', { x: posX, y: posY, button: button })
+    }
+    if (selectedTool == 'draw') {
+      lastPosDraw = null
     }
   }
-  let MouseDown = (button:string) => {
-    pressedMouse = true;
-    button = "";
+  let MouseDown = (button: string) => {
+    pressedMouse = true
+    //button = "";
   }
   let Draw = (x: number, y: number, button: string) => {
     if (lastPosDraw == null) {
@@ -63,7 +68,10 @@
     }
     posX = x
     posY = y
+    console.log(button)
+
     draw(lastPosDraw, x, y, color, button)
+    lastPosDraw = { x, y }
   }
   let CreateObject = () => {}
 
@@ -73,10 +81,13 @@
       let data: Data = JSON.parse(event.data)
       username = data.username
       color = data.color
-      console.log(data)
+      //console.log(selectedTool)
+
       let p = Create(data)
-      console.log(p)
       if (p == null) return
+
+      //console.log(p)
+      //electronIpc.send('click', {x: p.x, y: p.y, button: p.button})
 
       p.MoveMouse = SetPosition
       p.CreateObject = CreateObject

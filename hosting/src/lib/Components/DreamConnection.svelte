@@ -2,6 +2,7 @@
     import Dream from "./Dream.svelte";
     import type { Call } from "../../types/Call";
     import type { MyPeerConnection } from "$lib/WebRTC/MyPeer";
+    import Toolbar from "./Toolbar/Toolbar.svelte";
     interface DreamConnectionProps {
         call: MyPeerConnection;
         localStream?: MediaStream | null;
@@ -40,7 +41,7 @@
             call.data.send(JSON.stringify(data));
         }
     };
-    let selectedTool = $state<"draw" | "click">("draw");
+    let selectedTool = $state<"click" | "rubber" | "draw">("click");
     // $effect(() => {
     //     call.call.on("stream", (remoteStream) => {
     //         console.log("DreamConnection: Stream received", remoteStream);
@@ -94,6 +95,7 @@
             type: "BasicInput",
             device: "mouse",
             action: "click",
+            button: e.button == 1 ? "middle" : e.button == 2 ? "right" : "left",
             pressed: true,
             x: e.offsetX / (e.target as HTMLElement).clientWidth,
             y: e.offsetY / (e.target as HTMLElement).clientHeight,
@@ -106,6 +108,7 @@
             type: "BasicInput",
             device: "mouse",
             action: "click",
+            button: e.button == 1 ? "middle" : e.button == 2 ? "right" : "left",
             pressed: false,
             x: e.offsetX / (e.target as HTMLElement).clientWidth,
             y: e.offsetY / (e.target as HTMLElement).clientHeight,
@@ -113,10 +116,6 @@
         sendData(data);
         console.log("DreamConnection: Mouse up");
     };
-
-
-
-
 
     let MouseMove = (e: MouseEvent) => {
         //let {width, height} = (e.target as HTMLElement).getBoundingClientRect();
@@ -168,6 +167,7 @@
 </script>
 
 {#if media != null}
+    <Toolbar bind:selectedTool={selectedTool} />
     <Dream
         interarctive={false}
         stream={media}

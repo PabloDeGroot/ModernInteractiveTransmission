@@ -14,6 +14,7 @@
   )
   let conns = $state<MyPeerConnection[]>([])
   let media = $state<MediaStream | null>(null)
+  //let audio = $state<MediaStream | null>(null)
   window.addEventListener('beforeunload', () => {
     conns.forEach((conn) => {
       conn.close()
@@ -24,6 +25,7 @@
     .then((stream) => {
       media = stream
     })
+
     .catch((err) => {
       console.error('Error: ' + err)
     })
@@ -45,6 +47,12 @@
   api.getRoom().then((data: any) => {
     roomName = data
     console.log('Room', roomName)
+  })
+  api.onClearAll(() => {
+    console.log('Clearing')
+    if (canvas == null) return
+    console.log('Clearing Canvas')
+    canvas.Clear()
   })
   api.getUserId().then((data: any) => {
     userId = data
