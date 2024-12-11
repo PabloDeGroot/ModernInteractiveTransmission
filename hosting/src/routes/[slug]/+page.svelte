@@ -25,7 +25,7 @@
 {:else}
     <SignedIn let:user>
         <div
-            class="card variant-ghost-primary -backdrop-hue-rotate-90 backdrop-blur-md flex flex-col items-center p-2 room"
+            class="card variant-ghost-primary -backdrop-hue-rotate-90 backdrop-blur-md flex flex-col items-center p-2 room m-2"
         >
             <div class="card-content h-full flex-1 flex flex-col items-center">
                 <Room firebaseUser={user} roomId={$page.params.slug} {color} />

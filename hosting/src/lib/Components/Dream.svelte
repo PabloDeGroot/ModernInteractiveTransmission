@@ -41,10 +41,10 @@
     };
 </script>
 
-<div class="rounded h-full overflow-hidden flex">
+<div class="rounded h-full overflow-hidden flex items-center">
     <!-- svelte-ignore a11y_media_has_caption -->
     <video
-        class="max-h-full"
+        class="max-h-full h-fit"
         onmousemove={mouseMove}
         onmousedown={mouseDown}
         onmouseup={mouseUp}

@@ -1,4 +1,3 @@
-import "./index2.js";
 import "./exports.js";
 function get(key, parse = JSON.parse) {
   try {
@@ -14,17 +13,6 @@ function goto(url, opts = {}) {
   {
     throw new Error("Cannot call goto(...) on the server");
   }
-}
-{
-  const console_warn = console.warn;
-  console.warn = function warn(...args) {
-    if (args.length === 1 && /<(Layout|Page|Error)(_[\w$]+)?> was created (with unknown|without expected) prop '(data|form)'/.test(
-      args[0]
-    )) {
-      return;
-    }
-    console_warn(...args);
-  };
 }
 export {
   goto as g

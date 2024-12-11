@@ -26,6 +26,7 @@ class FirestoreCallChannel /*implements ICallChannel*/ {
         this.answerCollection = collection(this.colRef, "answer");
         this.unsubscribe = [onSnapshot(this.callCollection, (doc) => {
             doc.docChanges().forEach((change) => {
+                console.log("Signaler: Call change", change);
                 if (change.type === "added") {
                     console.log("Signaler: Emitting onCall", change.doc.id);
                     this.onCall?.(change.doc.id);
@@ -35,6 +36,7 @@ class FirestoreCallChannel /*implements ICallChannel*/ {
 
     }
     awnser = (caller: string, callee: string) => {
+        console.log("answering", caller, callee);
         let awnsRef = doc(this.answerCollection, caller.toString(), "0", callee.toString());
         setDoc(awnsRef, {});
         let callRef = doc(this.callCollection, caller.toString(),"0", callee.toString());

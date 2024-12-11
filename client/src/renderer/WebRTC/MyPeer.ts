@@ -13,25 +13,46 @@ import { FirestoreSignalingChannel } from "./FirestoreSignalingChannel";
 //polite peer
 
 
-/*
-An important thing to keep in mind is this: the roles of caller and callee can switch during perfect negotiation.
-If the polite peer is the caller and it sends an offer but there's a collision with the impolite peer, 
-the polite peer drops its offer and instead replies to the offer it has received from the impolite peer. 
-By doing so, the polite peer has switched from being the caller to the callee!
-*/
-const config: RTCConfiguration = {
-    iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun.l.google.com:5349" },
-        { urls: "stun:stun1.l.google.com:3478" },
-        { urls: "stun:stun1.l.google.com:5349" },
-        { urls: "stun:stun2.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:5349" },
-        { urls: "stun:stun3.l.google.com:3478" },
-        { urls: "stun:stun3.l.google.com:5349" },
-        { urls: "stun:stun4.l.google.com:19302" },
-        { urls: "stun:stun4.l.google.com:5349" }
-    ],
+const fetchIceServers = async () => {
+    const myHeaders = new Headers();
+    myHeaders.append("Content-Type", "application/json");
+    myHeaders.append("Authorization", "Bearer REDACTED_CLOUDFLARE_TURN_API_TOKEN");
+
+    const raw = JSON.stringify({
+        "ttl": 100000000
+    });
+
+    const requestOptions = {
+        method: "POST",
+        headers: myHeaders,
+        body: raw
+    };
+    const response = await fetch("https://rtc.live.cloudflare.com/v1/turn/keys/REDACTED_TURN_KEY_ID/credentials/generate", requestOptions);
+    return response.json();
+};
+
+const initializeIceServers = async () => {
+    const iceServers = await fetchIceServers();
+
+    const config: RTCConfiguration = {
+        iceServers: [
+            //{ urls: "stun:stun.my-stun-server.tld" },
+            { urls: "stun:stun.l.google.com:5349" },/*
+            { urls: "stun:stun1.l.google.com:3478" },
+            { urls: "stun:stun1.l.google.com:5349" },
+            { urls: "stun:stun2.l.google.com:19302" },
+            { urls: "stun:stun2.l.google.com:5349" },
+            { urls: "stun:stun3.l.google.com:3478" },
+            { urls: "stun:stun3.l.google.com:5349" },
+            { urls: "stun:stun4.l.google.com:19302" },
+            { urls: "stun:stun4.l.google.com:5349" }*/
+        ],
+    };
+
+    config.iceServers?.push(iceServers.iceServers);
+
+    console.log("Ice Servers", config);
+    return config;
 };
 
 export class MyPeerConnection {
@@ -43,34 +64,42 @@ export class MyPeerConnection {
     targetName: string;
     targetColor: string;
     signaler: FirestoreSignalingChannel;
-    pc = new RTCPeerConnection(config);
-    data = this.pc.createDataChannel("data");
+    pc!: RTCPeerConnection;
+    data!: RTCDataChannel;
+    onPcReady?: () => void;
+
     constructor(signaler: FirestoreSignalingChannel, target: string, id: string, caller: boolean) {
         this.signaler = signaler;
         this.target = target;
         this.id = id;
         this.caller = caller;
-        this.initPeerConnection();
-        this.initSignaling();
-        this.registerListeners();
-        
-        this.pc.ondatachannel = ((e) => {
+        initializeIceServers().then((config) => {
+            this.pc = new RTCPeerConnection(config);
+            this.data = this.pc.createDataChannel("data");
+            this.initPeerConnection();
+            this.initSignaling();
+            this.registerListeners();
 
-            console.log("My Peer: Data channel created", e.channel);
+            this.pc.ondatachannel = ((e) => {
+
+                console.log("My Peer: Data channel created", e.channel);
+            });
+            this.data.onclose = () => {
+                console.log("My Peer: Data channel closed");
+                this.cleanup();
+            }
+            this.data.onclosing = () => {
+                console.log("My Peer: Data channel closing");
+                this.cleanup();
+            }
+            this.data.onerror = () => {
+                console.log("My Peer: Data channel error");
+                this.cleanup();
+            }
+            this.onPcReady?.();
         });
-        this.data.onclose = () => {
-            console.log("My Peer: Data channel closed");
-            this.cleanup();
-        }
-        this.data.onclosing = () => {
-            console.log("My Peer: Data channel closing");
-            this.cleanup();
-        }
-        this.data.onerror = () => {
-            console.log("My Peer: Data channel error");
-            this.cleanup();
-        }
         console.log("My Peer: Created", this.id, this.target);
+
     }
     onclose: () => void;
 
@@ -133,6 +162,8 @@ export class MyPeerConnection {
             (receiver as any).playoutDelayHint = this.playoutDelayHint;
         }
     }
+    isSettingRemoteAnswerPending = false;
+
     onConnected?: () => void;
     initSignaling = async () => {
         this.signaler.onmessage = async ({ description, candidate, id, color, name }) => {
@@ -149,33 +180,41 @@ export class MyPeerConnection {
             console.log("Is Polite", polite);
             try {
                 if (description) {
-                    const offerCollision =
-                        description.type === "offer" &&
-                        (this.makingOffer || this.pc.signalingState !== "stable");
+
+                    // An offer may come in while we are busy processing SRD(answer).
+                    // In this case, we will be in "stable" by the time the offer is processed
+                    // so it is safe to chain it on our Operations Chain now.
+                    const readyForOffer =
+                        !this.makingOffer &&
+                        (this.pc.signalingState == "stable" || this.isSettingRemoteAnswerPending);
+                    const offerCollision = description.type == "offer" && !readyForOffer;
 
                     this.ignoreOffer = !polite && offerCollision;
                     if (this.ignoreOffer) {
                         return;
                     }
+                    this.isSettingRemoteAnswerPending = description.type == "answer";
+                    await this.pc.setRemoteDescription(description);  // SRD rolls back as needed
+                    this.isSettingRemoteAnswerPending = false;
 
-                    await this.pc.setRemoteDescription(description);
                     if (description.type === "offer") {
                         await this.pc.setLocalDescription();
                         console.log("My Peer: Local description set", this.pc.localDescription);
 
                         this.signaler.send({ description: this.pc.localDescription, id: this.id });
-                    } else if (description.type === "answer") {
+                    }
+                    /*else if (description.type === "answer") {
                         //this.signaler.send({ description: this.pc.localDescription, id: this.id });
                         this.changePlayOutDelay();
                         //this.onConnection?.({ data: this.data, pc: this.pc });
 
-                    }
+                    }*/
 
                 } else if (candidate) {
                     try {
-                        if (!this.pc.remoteDescription || !this.pc.remoteDescription.type) {
-                            await this.pc.addIceCandidate(candidate);
-                        }
+                        //if (!this.pc.remoteDescription || !this.pc.remoteDescription.type) {
+                        await this.pc.addIceCandidate(candidate);
+                        //}
                     } catch (err) {
                         if (!this.ignoreOffer) {
                             throw err;
@@ -266,7 +305,9 @@ class MyPeer {
             console.log("My Peer: IsCallee", callee);
             let connection = new MyPeerConnection(signal, target, this.id, callee);
             this.conns.push(connection);
-            this.onConnection?.(connection);
+            connection.onPcReady = () => {
+                this.onConnection?.(connection);
+            }
             /*
             connection.onConnected = () => {
 

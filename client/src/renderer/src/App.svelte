@@ -2,6 +2,7 @@
   //import GetRoom, { type Room, type UserRoom } from '../firebase/Room'
   import { FirestoreCallChannel } from '../WebRTC/FirestoreCallChannel'
   import MyPeer, { MyPeerConnection } from '../WebRTC/MyPeer'
+  import Canvas from './components/Canvas.svelte'
   import Presence from './components/Presence.svelte'
   import User from './components/User.svelte'
 
@@ -48,7 +49,17 @@
   api.getUserId().then((data: any) => {
     userId = data
   })
-
+  let canvas = $state<Canvas | null>(null)
+  let draw = (
+    lastPos: { x: number; y: number },
+    x: number,
+    y: number,
+    color: string,
+    button: string
+  ) => {
+    if (canvas == null) return
+    canvas.Draw(lastPos, x, y, color, 10, button)
+  }
   // Get Monitor Stream
   // Call every user in the room
   // Create User component and pass the connection
@@ -59,6 +70,9 @@
 {/if}
 {#if conns.length > 0 && media != null}
   {#each conns as conn}
-    <User connection={conn} localStream={media} />
+    <User connection={conn} localStream={media} {draw} />
   {/each}
+{/if}
+{#if media != null}
+  <Canvas bind:this={canvas} />
 {/if}

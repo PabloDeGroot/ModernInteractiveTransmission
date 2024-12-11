@@ -4,12 +4,15 @@
     y: number
     color?: string
     user?: string
+    tool?: string
   }
-  let { x, y, user = '', color = '#00ff00' }: CursorProps = $props()
+  let { x, y, tool = 'click', user = '', color = '#00ff00' }: CursorProps = $props()
+
+  let icon = tool == 'draw' ? 'draw' : 'cursor'
 </script>
 
 <div
-  class="cursor"
+  class={icon}
   style="left: {x}px; top: {y}px; display:flex; align-items: center; justify-content: center; width:max-content; height:max-content;"
 >
   <svg
@@ -30,9 +33,11 @@
     ></path>
   </svg>
   {#if user}
-  <p style="background-color: {color}; color: white; padding-inline: 0.5rem; border-radius: 0.5rem; border: 1px solid black; margin-left:-20px">
-    {user}
-  </p>
+    <p
+      style="background-color: {color}; color: white; padding-inline: 0.5rem; border-radius: 0.5rem; border: 1px solid black; margin-left:-20px"
+    >
+      {user}
+    </p>
   {/if}
 </div>
 

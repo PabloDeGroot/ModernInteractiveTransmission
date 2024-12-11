@@ -1,14 +1,14 @@
-import { F as FILENAME, C as push, K as push_element, O as pop_element, R as bind_props, G as pop, S as ensure_array_like, M as invalid_default_snippet, I as store_get, J as unsubscribe_stores } from "../../../chunks/index2.js";
+import { a4 as sanitize_slots, T as fallback, Z as attr, a5 as add_styles, V as slot, W as bind_props, S as pop, a0 as sanitize_props, _ as stringify, Q as push, a6 as ensure_array_like, a3 as invalid_default_snippet, a1 as store_get, a2 as unsubscribe_stores } from "../../../chunks/index2.js";
 import { p as page } from "../../../chunks/stores.js";
-import { f as firestore, a as auth, S as SignedIn } from "../../../chunks/SignedOut.js";
+import { f as firestore, a as auth, S as SignedIn } from "../../../chunks/SignedIn.js";
 import "firebase/auth";
-import { collection, onSnapshot, doc, setDoc, arrayUnion } from "firebase/firestore";
+import { doc, collection, onSnapshot, setDoc, arrayUnion } from "firebase/firestore";
 import "firebase/storage";
 import "firebase/analytics";
 import "firebase/database";
 import { w as writable } from "../../../chunks/index.js";
 import "firebase/compat/app";
-import { P as ProgressRadial } from "../../../chunks/ProgressRadial.js";
+import "../../../chunks/ProgressBar.svelte_svelte_type_style_lang.js";
 import "../../../chunks/client.js";
 function docStore(firestore2, ref, startWith) {
   let unsubscribe;
@@ -74,6 +74,61 @@ function collectionStore(firestore2, ref, startWith = []) {
     ref: colRef
   };
 }
+function ProgressRadial($$payload, $$props) {
+  const $$slots = sanitize_slots($$props);
+  const $$sanitized_props = sanitize_props($$props);
+  push();
+  let classesBase;
+  let value = fallback($$props["value"], () => void 0, true);
+  let stroke = fallback($$props["stroke"], 40);
+  let font = fallback($$props["font"], 56);
+  let strokeLinecap = fallback($$props["strokeLinecap"], "butt");
+  let transition = fallback($$props["transition"], "transition-[stroke-dashoffset]");
+  let width = fallback($$props["width"], "w-36");
+  let meter = fallback($$props["meter"], "stroke-surface-900 dark:stroke-surface-50");
+  let track = fallback($$props["track"], "stroke-surface-500/30");
+  let fill = fallback($$props["fill"], "fill-token");
+  let labelledby = fallback($$props["labelledby"], "");
+  const cBase = "progress-radial relative overflow-hidden";
+  const cBaseTrack = "fill-transparent";
+  const cBaseMeter = "fill-transparent -rotate-90 origin-[50%_50%]";
+  const baseSize = 512;
+  const radius = baseSize / 2 - stroke / 2;
+  let circumference = radius;
+  let dashoffset;
+  function setProgress(percent) {
+    circumference = radius * 2 * Math.PI;
+    dashoffset = circumference - percent / 100 * circumference;
+  }
+  setProgress(0);
+  classesBase = `${cBase} ${width} ${$$sanitized_props.class ?? ""}`;
+  $$payload.out += `<figure${attr("class", `progress-radial ${stringify(classesBase)}`)} data-testid="progress-radial" role="meter"${attr("aria-labelledby", labelledby)}${attr("aria-valuenow", value || 0)}${attr("aria-valuetext", value ? `${value}%` : "Indeterminate Spinner")}${attr("aria-valuemin", 0)}${attr("aria-valuemax", 100)}><svg${attr("viewBox", `0 0 ${stringify(baseSize)} ${stringify(baseSize)}`)}${attr("class", `rounded-full ${stringify([value === void 0 ? "animate-spin" : ""].filter(Boolean).join(" "))}`)}><circle${attr("class", `progress-radial-track ${stringify(cBaseTrack)} ${stringify(track)}`)}${attr("stroke-width", stroke)}${attr("r", radius)} cx="50%" cy="50%"></circle><circle${add_styles({
+    "stroke-dasharray": `${stringify(circumference)} ${stringify(circumference)}`,
+    "stroke-dashoffset": dashoffset
+  })}${attr("class", `progress-radial-meter ${stringify(cBaseMeter)} ${stringify(meter)} ${stringify(transition)}`)}${attr("stroke-width", stroke)}${attr("r", radius)} cx="50%" cy="50%"${attr("stroke-linecap", strokeLinecap)}></circle>`;
+  if (value != void 0 && value >= 0 && $$slots.default) {
+    $$payload.out += "<!--[-->";
+    $$payload.out += `<text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" font-weight="bold"${attr("font-size", font)}${attr("class", `progress-radial-text ${stringify(fill)}`)}><!---->`;
+    slot($$payload, $$props, "default", {});
+    $$payload.out += `<!----></text>`;
+  } else {
+    $$payload.out += "<!--[!-->";
+  }
+  $$payload.out += `<!--]--></svg></figure>`;
+  bind_props($$props, {
+    value,
+    stroke,
+    font,
+    strokeLinecap,
+    transition,
+    width,
+    meter,
+    track,
+    fill,
+    labelledby
+  });
+  pop();
+}
 function GetRoom(id) {
   return docStore(firestore, "room/" + id);
 }
@@ -89,9 +144,8 @@ function AddUser(ref, user) {
     );
   }
 }
-Dream[FILENAME] = "src/lib/Components/Dream.svelte";
 function Dream($$payload, $$props) {
-  push(Dream);
+  push();
   let {
     stream,
     mouseMove = void 0,
@@ -100,27 +154,16 @@ function Dream($$payload, $$props) {
     mouseWheel = void 0
   } = $$props;
   !navigator.userActivation.isActive;
-  $$payload.out += `<div class="rounded h-full overflow-hidden flex">`;
-  push_element($$payload, "div", 44, 0);
-  $$payload.out += `<video class="max-h-full" autoplay>`;
-  push_element($$payload, "video", 46, 4);
-  $$payload.out += `</video>`;
-  pop_element();
-  $$payload.out += ` `;
+  $$payload.out += `<div class="rounded h-full overflow-hidden flex"><video class="max-h-full" autoplay></video> `;
   {
     $$payload.out += "<!--[!-->";
   }
   $$payload.out += `<!--]--></div>`;
-  pop_element();
   bind_props($$props, { mouseMove, mouseDown, mouseUp, mouseWheel });
   pop();
 }
-Dream.render = function() {
-  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
-};
-DreamConnection[FILENAME] = "src/lib/Components/DreamConnection.svelte";
 function DreamConnection($$payload, $$props) {
-  push(DreamConnection);
+  push();
   let { call, localStream, remove = void 0 } = $$props;
   let media = null;
   call.pc.ontrack = (e) => {
@@ -210,9 +253,6 @@ function DreamConnection($$payload, $$props) {
   bind_props($$props, { remove, KeyEvent });
   pop();
 }
-DreamConnection.render = function() {
-  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
-};
 class FirestoreSignalingChannel {
   roomID;
   readRef;
@@ -248,19 +288,41 @@ class FirestoreSignalingChannel {
   };
   onmessage;
 }
-const config = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun.l.google.com:5349" },
-    { urls: "stun:stun1.l.google.com:3478" },
-    { urls: "stun:stun1.l.google.com:5349" },
-    { urls: "stun:stun2.l.google.com:19302" },
-    { urls: "stun:stun2.l.google.com:5349" },
-    { urls: "stun:stun3.l.google.com:3478" },
-    { urls: "stun:stun3.l.google.com:5349" },
-    { urls: "stun:stun4.l.google.com:19302" },
-    { urls: "stun:stun4.l.google.com:5349" }
-  ]
+const fetchIceServers = async () => {
+  const myHeaders = new Headers();
+  myHeaders.append("Content-Type", "application/json");
+  myHeaders.append("Authorization", "Bearer REDACTED_CLOUDFLARE_TURN_API_TOKEN");
+  const raw = JSON.stringify({
+    "ttl": 1e8
+  });
+  const requestOptions = {
+    method: "POST",
+    headers: myHeaders,
+    body: raw
+  };
+  const response = await fetch("https://rtc.live.cloudflare.com/v1/turn/keys/REDACTED_TURN_KEY_ID/credentials/generate", requestOptions);
+  return response.json();
+};
+const initializeIceServers = async () => {
+  const iceServers = await fetchIceServers();
+  const config = {
+    iceServers: [
+      //{ urls: "stun:stun.my-stun-server.tld" },
+      { urls: "stun:stun.l.google.com:5349" }
+      /*
+      { urls: "stun:stun1.l.google.com:3478" },
+      { urls: "stun:stun1.l.google.com:5349" },
+      { urls: "stun:stun2.l.google.com:19302" },
+      { urls: "stun:stun2.l.google.com:5349" },
+      { urls: "stun:stun3.l.google.com:3478" },
+      { urls: "stun:stun3.l.google.com:5349" },
+      { urls: "stun:stun4.l.google.com:19302" },
+      { urls: "stun:stun4.l.google.com:5349" }*/
+    ]
+  };
+  config.iceServers?.push(iceServers.iceServers);
+  console.log("Ice Servers", config);
+  return config;
 };
 class MyPeerConnection {
   target;
@@ -271,8 +333,9 @@ class MyPeerConnection {
   targetName;
   targetColor;
   signaler;
-  pc = new RTCPeerConnection(config);
+  pc;
   data = null;
+  onPcReady;
   constructor(signaler, target, id, caller, myname, myColor) {
     this.signaler = signaler;
     this.target = target;
@@ -280,32 +343,37 @@ class MyPeerConnection {
     this.caller = caller;
     this.myname = myname;
     this.myColor = myColor;
-    this.initPeerConnection();
-    this.initSignaling();
-    this.registerListeners();
-    this.pc.ondatachannel = (e) => {
-      console.log("My Peer: Data channel created", e.channel);
-      this.data = e.channel;
-      this.data.onclose = () => {
-        this.cleanup();
-      };
-      this.data.addEventListener("message", (e2) => {
-        if (typeof e2.data === "string") {
-          console.log("My Peer: Data channel message", e2.data);
-        }
-        if (e2.data == "close") {
+    initializeIceServers().then((config) => {
+      this.pc = new RTCPeerConnection(config);
+      this.initPeerConnection();
+      this.initSignaling();
+      this.registerListeners();
+      this.pc.ondatachannel = (e) => {
+        console.log("My Peer: Data channel created", e.channel);
+        this.data = e.channel;
+        this.data.onclose = () => {
+          console.log("My Peer: Data channel closed");
           this.cleanup();
-        }
-      });
-      this.data.onerror = (e2) => {
-        console.error(e2);
-        this.cleanup();
+        };
+        this.data.addEventListener("message", (e2) => {
+          if (typeof e2.data === "string") {
+            console.log("My Peer: Data channel message", e2.data);
+          }
+          if (e2.data == "close") {
+            this.cleanup();
+          }
+        });
+        this.data.onerror = (e2) => {
+          console.error(e2);
+          this.cleanup();
+        };
+        this.data.onclosing = () => {
+          console.log("My Peer: Data channel closing");
+          this.cleanup();
+        };
       };
-      this.data.onclosing = () => {
-        console.log("My Peer: Data channel closing");
-        this.cleanup();
-      };
-    };
+      this.onPcReady?.();
+    });
     console.log("My Peer: Created", this.id, this.target);
   }
   onClose;
@@ -313,7 +381,7 @@ class MyPeerConnection {
     console.log("My Peer: Cleanup");
     this.signaler.close();
     this.close();
-    this.pc.close();
+    this.pc?.close();
     this.data?.close();
     if (this.onClose) {
       console.log("My Peer: Close callback");
@@ -358,6 +426,7 @@ class MyPeerConnection {
       receiver.playoutDelayHint = this.playoutDelayHint;
     }
   };
+  isSettingRemoteAnswerPending = false;
   onConnected;
   initSignaling = async () => {
     this.signaler.onmessage = async ({ description, candidate, id, type }) => {
@@ -376,15 +445,15 @@ class MyPeerConnection {
       console.log("Is Polite", polite);
       try {
         if (description) {
-          const offerCollision = description.type === "offer" && (this.makingOffer || this.pc.signalingState !== "stable");
-          if (this.pc.connectionState === "connected") {
-            return;
-          }
+          const readyForOffer = !this.makingOffer && (this.pc.signalingState == "stable" || this.isSettingRemoteAnswerPending);
+          const offerCollision = description.type == "offer" && !readyForOffer;
           this.ignoreOffer = !polite && offerCollision;
           if (this.ignoreOffer) {
             return;
           }
+          this.isSettingRemoteAnswerPending = description.type == "answer";
           await this.pc.setRemoteDescription(description);
+          this.isSettingRemoteAnswerPending = false;
           if (description.type === "offer") {
             await this.pc.setLocalDescription();
             console.log("My Peer: Local description set", this.pc.localDescription);
@@ -405,6 +474,9 @@ class MyPeerConnection {
     };
   };
   registerListeners = () => {
+    this.pc.onicecandidateerror = (e) => {
+      console.error("MyPeer IceCandidateError: ", e);
+    };
     this.pc.addEventListener("icegatheringstatechange", () => {
       console.log(
         `ICE gathering state changed: ${this.pc.iceGatheringState}`
@@ -422,13 +494,9 @@ class MyPeerConnection {
     this.pc.addEventListener("signalingstatechange", () => {
       console.log(`Signaling state change: ${this.pc.signalingState}`);
     });
-    this.pc.addEventListener("iceconnectionstatechange ", () => {
-      console.log(
-        `ICE connection state change: ${this.pc.iceConnectionState}`
-      );
-    });
   };
   close = () => {
+    console.log("My Peer: Close");
     this.pc.close();
     this.data?.close();
   };
@@ -454,6 +522,7 @@ class MyPeer {
   //pc = new RTCPeerConnection(config);
   //data = this.pc.createDataChannel("data");
   constructor(caller, id, myname, myColor) {
+    console.log("My Peer: Created", id);
     this.caller = caller;
     this.id = id;
     this.myname = myname;
@@ -478,7 +547,9 @@ class MyPeer {
       console.log("My Peer: IsCallee", callee);
       let connection = new MyPeerConnection(signal, target, this.id, callee, this.myname, this.myColor);
       this.conns.push(connection);
-      this.onConnection?.(connection);
+      connection.onPcReady = () => {
+        this.onConnection?.(connection);
+      };
     };
   };
 }
@@ -497,6 +568,7 @@ class FirestoreCallChannel {
     this.answerCollection = collection(this.colRef, "answer");
     this.unsubscribe = [onSnapshot(this.callCollection, (doc2) => {
       doc2.docChanges().forEach((change) => {
+        console.log("Signaler: Call change", change);
         if (change.type === "added") {
           console.log("Signaler: Emitting onCall", change.doc.id);
           this.onCall?.(change.doc.id);
@@ -505,6 +577,7 @@ class FirestoreCallChannel {
     })];
   }
   awnser = (caller, callee) => {
+    console.log("answering", caller, callee);
     let awnsRef = doc(this.answerCollection, caller.toString(), "0", callee.toString());
     setDoc(awnsRef, {});
     let callRef = doc(this.callCollection, caller.toString(), "0", callee.toString());
@@ -532,9 +605,8 @@ class FirestoreCallChannel {
   onCall;
   onConnection;
 }
-Room[FILENAME] = "src/lib/Components/Room.svelte";
 function Room($$payload, $$props) {
-  push(Room);
+  push();
   var uid = auth.currentUser?.uid;
   var name = auth.currentUser?.displayName;
   let { firebaseUser, roomId, color = "red" } = $$props;
@@ -581,80 +653,38 @@ function Room($$payload, $$props) {
   window.onkeyup = (e) => {
     console.log("Room: Key released", e);
   };
-  $$payload.out += `<div class="flex flex-col items-center justify-center w-full h-full">`;
-  push_element($$payload, "div", 219, 0);
-  $$payload.out += `<div class="flex-1 h-full">`;
-  push_element($$payload, "div", 220, 4);
-  $$payload.out += `<div class="main-dream h-full flex justify-center">`;
-  push_element($$payload, "div", 221, 8);
+  $$payload.out += `<div class="flex flex-col items-center justify-center w-full h-full"><div class="flex-1 h-full"><div class="main-dream h-full flex justify-center">`;
   if (connections.length == 0) {
     $$payload.out += "<!--[-->";
-    $$payload.out += `<p class="self-center">`;
-    push_element($$payload, "p", 223, 16);
-    $$payload.out += `Waiting for someone to start sharing...</p>`;
-    pop_element();
+    $$payload.out += `<p class="self-center">Waiting for someone to start sharing...</p>`;
   } else {
     $$payload.out += "<!--[!-->";
     DreamConnection($$payload, { call: connections[0], localStream });
   }
-  $$payload.out += `<!--]--></div>`;
-  pop_element();
-  $$payload.out += ` `;
+  $$payload.out += `<!--]--></div> `;
   if (connections.length > 1) {
     $$payload.out += "<!--[-->";
     const each_array = ensure_array_like(connections.slice(1));
-    $$payload.out += `<div class="other-dreams">`;
-    push_element($$payload, "div", 235, 12);
-    $$payload.out += `<!--[-->`;
+    $$payload.out += `<div class="other-dreams"><!--[-->`;
     for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
       let stream = each_array[$$index];
-      $$payload.out += `<p>`;
-      push_element($$payload, "p", 237, 20);
-      $$payload.out += `dsada</p>`;
-      pop_element();
-      $$payload.out += ` <button>`;
-      push_element($$payload, "button", 238, 20);
+      $$payload.out += `<p>dsada</p> <button>`;
       DreamConnection($$payload, { call: stream, localStream });
       $$payload.out += `<!----></button>`;
-      pop_element();
     }
     $$payload.out += `<!--]--></div>`;
-    pop_element();
   } else {
     $$payload.out += "<!--[!-->";
   }
-  $$payload.out += `<!--]--></div>`;
-  pop_element();
-  $$payload.out += ` <div class="flex items-center justify-center w-full mb-3 absolute bottom-0">`;
-  push_element($$payload, "div", 251, 8);
-  $$payload.out += `<button class="btn variant-filled-secondary mr-4">`;
-  push_element($$payload, "button", 254, 12);
-  $$payload.out += `Share</button>`;
-  pop_element();
-  $$payload.out += ` <button class="btn variant-filled-secondary">`;
-  push_element($$payload, "button", 264, 12);
-  $$payload.out += `Share with App</button>`;
-  pop_element();
-  $$payload.out += `</div>`;
-  pop_element();
-  $$payload.out += `</div>`;
-  pop_element();
+  $$payload.out += `<!--]--></div> <div class="flex items-center justify-center w-full mb-3 absolute bottom-0"><button class="btn variant-filled-secondary mr-4">Share</button> <button class="btn variant-filled-secondary">Share with App</button></div></div>`;
   pop();
 }
-Room.render = function() {
-  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
-};
-EnsureLogin[FILENAME] = "src/lib/Components/EnsureLogin.svelte";
 function EnsureLogin($$payload, $$props) {
-  push(EnsureLogin);
+  push();
   pop();
 }
-EnsureLogin.render = function() {
-  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
-};
-_page[FILENAME] = "src/routes/[slug]/+page.svelte";
 function _page($$payload, $$props) {
-  push(_page);
+  push();
   var $$store_subs;
   let ready = false;
   auth.authStateReady().then(() => {
@@ -678,19 +708,13 @@ function _page($$payload, $$props) {
       children: invalid_default_snippet,
       $$slots: {
         default: ($$payload2, { user }) => {
-          $$payload2.out += `<div class="card variant-ghost-primary -backdrop-hue-rotate-90 backdrop-blur-md flex flex-col items-center p-2 room svelte-l1jl19">`;
-          push_element($$payload2, "div", 27, 8);
-          $$payload2.out += `<div class="card-content h-full flex-1 flex flex-col items-center">`;
-          push_element($$payload2, "div", 30, 12);
+          $$payload2.out += `<div class="card variant-ghost-primary -backdrop-hue-rotate-90 backdrop-blur-md flex flex-col items-center p-2 room svelte-l1jl19"><div class="card-content h-full flex-1 flex flex-col items-center">`;
           Room($$payload2, {
             firebaseUser: user,
             roomId: store_get($$store_subs ??= {}, "$page", page).params.slug,
             color
           });
-          $$payload2.out += `<!----></div>`;
-          pop_element();
-          $$payload2.out += `</div>`;
-          pop_element();
+          $$payload2.out += `<!----></div></div>`;
         }
       }
     });
@@ -702,9 +726,6 @@ function _page($$payload, $$props) {
   if ($$store_subs) unsubscribe_stores($$store_subs);
   pop();
 }
-_page.render = function() {
-  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
-};
 export {
   _page as default
 };

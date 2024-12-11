@@ -5,6 +5,7 @@ import icon from '../../resources/icon.png?asset'
 import { screen } from 'electron'
 import MenuBuilder from './menu'
 import { Button, mouse, keyboard, KeyboardClass, Key } from "@nut-tree-fork/nut-js"
+import { k } from 'vite/dist/node/types.d-aGj9QkWt'
 const path = require('path')
 
 let room = "room1";
@@ -35,14 +36,14 @@ function createWindow(): void {
     }
   })
 
-  mainWindow.setAlwaysOnTop(true);
+  //mainWindow.setAlwaysOnTop(true);
   mainWindow.setIgnoreMouseEvents(true);
 
   mainWindow.setFullScreenable(false);
-  mainWindow.setKiosk(true);
-  mainWindow.setMenu(null);
-  mainWindow.setMovable(false);
-  mainWindow.setFocusable(false);
+  //mainWindow.setKiosk(true);
+  //mainWindow.setMenu(null);
+  //mainWindow.setMovable(false);
+  //mainWindow.setFocusable(false);
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
@@ -121,13 +122,81 @@ app.whenReady().then(() => {
     if (key.length === 1) {
       key = key.toUpperCase();
     }
-    if(key == "Shift"){
-      key = "LeftShift";
+    key = key
+      .replace("Digit", "Num")
+      .replace("Key", "")
+      .replace("Numpad", "NumPad")
+      .replace("Meta", "Win")
+      ;
+    switch (key) {
+      case "ShiftLeft":
+        key = "LeftShift";
+        break;
+      case "ShiftRight":
+        key = "RightShift";
+        break;
+
+      case "ControlLeft":
+        key = "LeftControl";
+        break;
+      case "ControlRight":
+        key = "RightControl";
+        break;
+      case "AltLeft":
+        key = "LeftAlt";
+        break;
+      case "AltRight":
+        key = "RightAlt";
+        break;
+      case "BracketLeft":
+        key = "LeftBracket";
+        break;
+      case "BracketRight":
+        key = "RightBracket";
+        break;
+      case "WinLeft":
+        key = "LeftWin";
+        break;
+      case "WinRight":
+        key = "RightWin";
+        break;
+
+      case "PrintScreen":
+        key = "Print";
+        break;
+      case ",":
+        key = "Comma";
+        break;
+      case ".":
+        key = "Period";
+        break;
+      case "/":
+        key = "Slash";
+        break;
+      case "NumPadDivide":
+        key = "Divide";
+        break;
+      case "NumPadMultiply":
+        key = "Multiply";
+        break;
+      case "NumPadSubtract":
+        key = "Subtract";
+        break;
+      case "NumPadAdd":
+        key = "Add";
+        break;
+      case "NumPadEnter":
+        key = "Enter";
+        break;
+      case "NumPadDecimal":
+        key = "Decimal";
+        break;
+
+
+
     }
-    if(key == "Meta"){
-      key = "LeftWin";
-    }
-    
+
+
     let keycode = Key[key as keyof KeyboardClass];
     console.log(arg);
     console.log(keycode);

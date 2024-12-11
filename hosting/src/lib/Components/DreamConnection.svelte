@@ -7,7 +7,11 @@
         localStream?: MediaStream | null;
         remove?: (redial: boolean) => void;
     }
-    let { call, localStream, remove = $bindable() }: DreamConnectionProps = $props();
+    let {
+        call,
+        localStream,
+        remove = $bindable(),
+    }: DreamConnectionProps = $props();
     let media = $state<MediaStream | null>(null);
     call.pc.ontrack = (e) => {
         console.log("Room: Track received", e);
@@ -16,12 +20,13 @@
     $effect(() => {
         if (localStream != null) {
             console.log("Room: Adding tracks to connection");
+
             localStream.getTracks().forEach((track) => {
                 call.pc.addTrack(track, localStream!);
             });
         }
     });
-    
+
     let sendData = (data: any) => {
         if (call.data == null) return;
         let username = call.myname;
@@ -31,11 +36,11 @@
             call.data.onopen = () => {
                 call.data!.send(JSON.stringify(data));
             };
-        }else{
-            
+        } else {
             call.data.send(JSON.stringify(data));
         }
     };
+    let selectedTool = $state<"draw" | "click">("draw");
     // $effect(() => {
     //     call.call.on("stream", (remoteStream) => {
     //         console.log("DreamConnection: Stream received", remoteStream);
@@ -84,16 +89,48 @@
         sendData(data);
         console.log("DreamConnection: Clicked");
     };
+    let MouseDown = (e: MouseEvent) => {
+        let data = {
+            type: "BasicInput",
+            device: "mouse",
+            action: "click",
+            pressed: true,
+            x: e.offsetX / (e.target as HTMLElement).clientWidth,
+            y: e.offsetY / (e.target as HTMLElement).clientHeight,
+        };
+        sendData(data);
+        console.log("DreamConnection: Mouse down");
+    };
+    let MouseUp = (e: MouseEvent) => {
+        let data = {
+            type: "BasicInput",
+            device: "mouse",
+            action: "click",
+            pressed: false,
+            x: e.offsetX / (e.target as HTMLElement).clientWidth,
+            y: e.offsetY / (e.target as HTMLElement).clientHeight,
+        };
+        sendData(data);
+        console.log("DreamConnection: Mouse up");
+    };
+
+
+
+
+
     let MouseMove = (e: MouseEvent) => {
         //let {width, height} = (e.target as HTMLElement).getBoundingClientRect();
         let data = {
             type: "BasicInput",
             device: "mouse",
             action: "move",
+            selectedTool: selectedTool,
+            //action: "ck",
+            erase: false,
             x: e.offsetX / (e.target as HTMLElement).clientWidth,
             y: e.offsetY / (e.target as HTMLElement).clientHeight,
         };
-        
+
         sendData(data);
         console.log("DreamConnection: Mouse moved");
     };
@@ -117,7 +154,7 @@
             type: "BasicInput",
             device: "keyboard",
             action: down ? "press" : "release",
-            key: e.key,
+            key: e.code,
         };
         sendData(data);
         console.log("DreamConnection: Key pressed");
@@ -136,8 +173,8 @@
         stream={media}
         local={false}
         mouseMove={MouseMove}
-        mouseDown={()=>{/*TODO*/}}
-        mouseUp={OnClick}
+        mouseDown={MouseDown}
+        mouseUp={MouseUp}
         mouseWheel={Scroll}
     />
 {/if}

@@ -19,21 +19,62 @@ If the polite peer is the caller and it sends an offer but there's a collision w
 the polite peer drops its offer and instead replies to the offer it has received from the impolite peer. 
 By doing so, the polite peer has switched from being the caller to the callee!
 */
-const config: RTCConfiguration = {
-    iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun.l.google.com:5349" },
-        { urls: "stun:stun1.l.google.com:3478" },
-        { urls: "stun:stun1.l.google.com:5349" },
-        { urls: "stun:stun2.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:5349" },
-        { urls: "stun:stun3.l.google.com:3478" },
-        { urls: "stun:stun3.l.google.com:5349" },
-        { urls: "stun:stun4.l.google.com:19302" },
-        { urls: "stun:stun4.l.google.com:5349" }
-    ],
+//REDACTED_TURN_KEY_ID
+//REDACTED_CLOUDFLARE_TURN_API_TOKEN
+
+
+//REDACTED_TURN_KEY_ID
+//REDACTED_CLOUDFLARE_TURN_API_TOKEN
+
+/*
+curl -X POST \
+    -H "Authorization: Bearer REDACTED_CLOUDFLARE_TURN_API_TOKEN" \
+    -H "Content-Type: application/json" -d '{"ttl": 86400}' \
+    https://rtc.live.cloudflare.com/v1/turn/keys/REDACTED_TURN_KEY_ID/credentials/generate
+*/
+const fetchIceServers = async () => {
+    const myHeaders = new Headers();
+    myHeaders.append("Content-Type", "application/json");
+    myHeaders.append("Authorization", "Bearer REDACTED_CLOUDFLARE_TURN_API_TOKEN");
+
+    const raw = JSON.stringify({
+        "ttl": 100000000
+    });
+
+    const requestOptions = {
+        method: "POST",
+        headers: myHeaders,
+        body: raw
+    };
+    const response = await fetch("https://rtc.live.cloudflare.com/v1/turn/keys/REDACTED_TURN_KEY_ID/credentials/generate", requestOptions);
+    return response.json();
 };
 
+const initializeIceServers = async () => {
+    const iceServers = await fetchIceServers();
+
+    const config: RTCConfiguration = {
+        iceServers: [
+            //{ urls: "stun:stun.my-stun-server.tld" },
+            { urls: "stun:stun.l.google.com:5349" },/*
+            { urls: "stun:stun1.l.google.com:3478" },
+            { urls: "stun:stun1.l.google.com:5349" },
+            { urls: "stun:stun2.l.google.com:19302" },
+            { urls: "stun:stun2.l.google.com:5349" },
+            { urls: "stun:stun3.l.google.com:3478" },
+            { urls: "stun:stun3.l.google.com:5349" },
+            { urls: "stun:stun4.l.google.com:19302" },
+            { urls: "stun:stun4.l.google.com:5349" }*/
+        ],
+    };
+
+    config.iceServers?.push(iceServers.iceServers);
+
+    console.log("Ice Servers", config);
+    return config;
+};
+
+//const config = await initializeIceServers();
 class MyPeerConnection {
     target: string;
     id: string;
@@ -43,8 +84,10 @@ class MyPeerConnection {
     targetName?: string;
     targetColor?: string;
     signaler: FirestoreSignalingChannel;
-    pc = new RTCPeerConnection(config);
+    pc!: RTCPeerConnection;
     data = null as RTCDataChannel | null;
+
+    onPcReady?: () => void;
     constructor(signaler: FirestoreSignalingChannel, target: string, id: string, caller: boolean, myname: string, myColor: string) {
         this.signaler = signaler;
         this.target = target;
@@ -52,35 +95,38 @@ class MyPeerConnection {
         this.caller = caller;
         this.myname = myname;
         this.myColor = myColor;
-        this.initPeerConnection();
-        this.initSignaling();
-        this.registerListeners();
-        this.pc.ondatachannel = ((e) => {
-            console.log("My Peer: Data channel created", e.channel);
-            this.data = e.channel;
-            this.data.onclose = () => {
-                this.cleanup();
-            }
-            this.data.addEventListener('message', (e) => {
-                if (typeof e.data === "string") {
-                    console.log("My Peer: Data channel message", e.data);
-                }
-                if (e.data == "close") {
+        initializeIceServers().then((config) => {
+            this.pc = new RTCPeerConnection(config);
+            this.initPeerConnection();
+            this.initSignaling();
+            this.registerListeners();
+            this.pc.ondatachannel = ((e) => {
+                console.log("My Peer: Data channel created", e.channel);
+                this.data = e.channel;
+                this.data.onclose = () => {
+                    console.log("My Peer: Data channel closed");
                     this.cleanup();
                 }
+                this.data.addEventListener('message', (e) => {
+                    if (typeof e.data === "string") {
+                        console.log("My Peer: Data channel message", e.data);
+                    }
+                    if (e.data == "close") {
+                        this.cleanup();
+                    }
+                });
+                this.data.onerror = (e) => {
+                    console.error(e);
+                    this.cleanup();
+                }
+                this.data.onclosing = () => {
+                    console.log("My Peer: Data channel closing");
+                    this.cleanup();
+
+                }
+
             });
-            this.data.onerror = (e) => {
-                console.error(e);
-                this.cleanup();
-            }
-            this.data.onclosing = () => {
-                console.log("My Peer: Data channel closing");
-                this.cleanup();
-
-            }
-
-
-
+            this.onPcReady?.();
         });
         console.log("My Peer: Created", this.id, this.target);
     }
@@ -90,7 +136,7 @@ class MyPeerConnection {
         console.log("My Peer: Cleanup");
         this.signaler.close();
         this.close();
-        this.pc.close();
+        this.pc?.close();
         this.data?.close();
         if (this.onClose) {
             console.log("My Peer: Close callback");
@@ -113,7 +159,7 @@ class MyPeerConnection {
         // };
 
 
-        this.pc.onnegotiationneeded = async (e) => {
+        this.pc!.onnegotiationneeded = async (e) => {
             try {
                 console.log("My Peer: Negotiation needed", e);
                 this.makingOffer = true;
@@ -128,14 +174,14 @@ class MyPeerConnection {
         };
 
 
-        this.pc.oniceconnectionstatechange = () => {
+        this.pc!.oniceconnectionstatechange = () => {
             console.log("My Peer: ICE connection state change", this.pc.iceConnectionState);
-            if (this.pc.iceConnectionState === "failed") {
-                this.pc.restartIce();
+            if (this.pc!.iceConnectionState === "failed") {
+                this.pc!.restartIce();
             }
         };
 
-        this.pc.onicecandidate = (e) => {
+        this.pc!.onicecandidate = (e) => {
             if (e.candidate === null) return;
             console.log("My Peer: ICE candidate", e.candidate);
             this.signaler.send({ candidate: e.candidate, id: this.id, color: this.myColor, name: this.myname })
@@ -145,12 +191,14 @@ class MyPeerConnection {
 
     playoutDelayHint = 0;
     changePlayOutDelay = () => {
-        let recievers = this.pc.getReceivers();
+        let recievers = this.pc!.getReceivers();
         if (this.playoutDelayHint < 0) return;
         for (const receiver of recievers) {
             (receiver as any).playoutDelayHint = this.playoutDelayHint;
         }
     }
+    isSettingRemoteAnswerPending = false;
+
     onConnected?: () => void;
     initSignaling = async () => {
         this.signaler.onmessage = async ({ description, candidate, id, type }) => {
@@ -169,24 +217,23 @@ class MyPeerConnection {
             console.log("Is Polite", polite);
             try {
                 if (description) {
-                    const offerCollision =
-                        description.type === "offer" &&
-                        (this.makingOffer || this.pc.signalingState !== "stable");
-                    if (this.pc.connectionState === "connected") {
-                        return;
-                    }
+                    const readyForOffer =
+                        !this.makingOffer &&
+                        (this.pc!.signalingState == "stable" || this.isSettingRemoteAnswerPending);
+                    const offerCollision = description.type == "offer" && !readyForOffer;
 
                     this.ignoreOffer = !polite && offerCollision;
                     if (this.ignoreOffer) {
                         return;
                     }
-
-                    await this.pc.setRemoteDescription(description);
+                    this.isSettingRemoteAnswerPending = description.type == "answer";
+                    await this.pc!.setRemoteDescription(description);
+                    this.isSettingRemoteAnswerPending = false;
                     if (description.type === "offer") {
-                        await this.pc.setLocalDescription();
-                        console.log("My Peer: Local description set", this.pc.localDescription);
+                        await this.pc!.setLocalDescription();
+                        console.log("My Peer: Local description set", this.pc!.localDescription);
 
-                        this.signaler.send({ description: this.pc.localDescription, id: this.id });
+                        this.signaler.send({ description: this.pc!.localDescription, id: this.id });
                     } /*else if (description.type === "answer") {
                         //this.signaler.send({ description: this.pc.localDescription, id: this.id });
                         this.changePlayOutDelay();
@@ -196,7 +243,7 @@ class MyPeerConnection {
 
                 } else if (candidate) {
                     try {
-                        await this.pc.addIceCandidate(candidate);
+                        await this.pc!.addIceCandidate(candidate);
                     } catch (err) {
                         if (!this.ignoreOffer) {
                             throw err;
@@ -209,6 +256,10 @@ class MyPeerConnection {
         };
     };
     registerListeners = () => {
+        this.pc.onicecandidateerror = (e) => {
+            console.error("MyPeer IceCandidateError: ", e);
+        }
+
         this.pc.addEventListener('icegatheringstatechange', () => {
             console.log(
                 `ICE gathering state changed: ${this.pc.iceGatheringState}`);
@@ -228,12 +279,10 @@ class MyPeerConnection {
             console.log(`Signaling state change: ${this.pc.signalingState}`);
         });
 
-        this.pc.addEventListener('iceconnectionstatechange ', () => {
-            console.log(
-                `ICE connection state change: ${this.pc.iceConnectionState}`);
-        });
+
     };
     close = () => {
+        console.log("My Peer: Close");
         this.pc.close();
         this.data?.close();
     }
@@ -261,6 +310,7 @@ class MyPeer {
     //pc = new RTCPeerConnection(config);
     //data = this.pc.createDataChannel("data");
     constructor(caller: FirestoreCallChannel, id: string, myname: string, myColor: string) {
+        console.log("My Peer: Created", id);
         this.caller = caller;
         this.id = id;
         this.myname = myname;
@@ -290,8 +340,9 @@ class MyPeer {
             let connection = new MyPeerConnection(signal, target, this.id, callee, this.myname, this.myColor);
             this.conns.push(connection);
             //connection.onConnected = () => {
-            this.onConnection?.(connection);
-
+            connection.onPcReady = () => {
+                this.onConnection?.(connection);
+            }
             //}
 
         }

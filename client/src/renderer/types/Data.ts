@@ -3,10 +3,13 @@
 export abstract class Data {
     abstract type: "BasicInput" | "AdvancedInput"
     IPC!: Electron.IpcRenderer
-    username:string
-    color:string
-    MoveMouse!: (x: number, y: number) => void
+    username: string
+    color: string
+    MoveMouse!: (x: number, y: number, selectedTool: string) => void
+    Draw!: (x: number, y: number, button: string) => void
     CreateObject!: () => void
+    MouseUp!: (button: string) => void
+    MouseDown!: (button: string) => void
     abstract Run: () => void
 
 }
@@ -19,7 +22,7 @@ abstract class BasicInput extends Data {
 
 abstract class MouseInput extends BasicInput {
     declare device: "mouse"
-    abstract action: "click" | "move" | "scroll"
+    abstract action: "click" | "move" | "scroll" | "draw"
     x: number
     y: number
     constructor(x: number, y: number) {
@@ -34,22 +37,32 @@ abstract class MouseInput extends BasicInput {
 export class ClickInput extends MouseInput {
     declare action: "click"
     button: "left" | "right" | "middle"
-    constructor(x: number, y: number, button: "left" | "right" | "middle") {
+    pressed: boolean
+    constructor(x: number, y: number, pressed: boolean, button: "left" | "right" | "middle") {
         super(x, y)
         this.button = button
+        this.pressed = pressed
     }
     Run = () => {
-        this.IPC.send("clickMouse", { x: this.x, y: this.y, type: this.button })
+        if (!this.pressed) {
+            //this.IPC.send("clickMouse", { x: this.x, y: this.y, type: this.button })
+            this.MouseDown(this.button)
+        }else{
+            this.MouseUp(this.button)
+        }
     }
 }
+
 export class MoveInput extends MouseInput {
     declare action: "move"
+    selectedTool: string
 
-    constructor(x: number, y: number) {
+    constructor(x: number, y: number, selectedTool: string) {
         super(x, y)
+        this.selectedTool = selectedTool
     }
     Run = () => {
-        this.MoveMouse(this.x, this.y)
+        this.MoveMouse(this.x, this.y, this.selectedTool)
     }
 }
 export class ScrollInput extends MouseInput {
@@ -153,15 +166,17 @@ function CreateBasicInput(data: BasicInput) {
 function CreateMouseInput(data: any) {
     switch (data.action) {
         case "click":
-            return new ClickInput(data.x, data.y, data.button)
+            return new ClickInput(data.x, data.y, data.pressed, data.button)
+
         case "move":
-            return new MoveInput(data.x, data.y)
+            return new MoveInput(data.x, data.y, data.selectedTool)
         case "scroll":
             return new ScrollInput(data.x, data.y, data.amount, data.direction)
         default:
             throw new Error("Invalid MouseInput")
     }
 }
+
 function CreateKeyboardInput(data: any) {
     return new KeyboardInput(data.key, data.action)
 }
