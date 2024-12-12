@@ -1137,6 +1137,14 @@ function pop$1(component) {
   throw_rune_error("$props");
   throw_rune_error("$bindable");
 }
+const regex_return_characters = /\r/g;
+function hash(str) {
+  str = str.replace(regex_return_characters, "");
+  let hash2 = 5381;
+  let i = str.length;
+  while (i--) hash2 = (hash2 << 5) - hash2 ^ str.charCodeAt(i);
+  return (hash2 >>> 0).toString(36);
+}
 const DOM_BOOLEAN_ATTRIBUTES = [
   "allowfullscreen",
   "async",
@@ -1505,8 +1513,8 @@ function render(component, options = {}) {
   for (const cleanup of on_destroy) cleanup();
   on_destroy = prev_on_destroy;
   let head = payload.head.out + payload.head.title;
-  for (const { hash, code } of payload.css) {
-    head += `<style id="${hash}">${code}</style>`;
+  for (const { hash: hash2, code } of payload.css) {
+    head += `<style id="${hash2}">${code}</style>`;
   }
   return {
     head,
@@ -1529,6 +1537,22 @@ function spread_attributes(attrs, classes, styles, flags = 0) {
     attr_str += attr(name, attrs[name], is_html && is_boolean_attribute(name));
   }
   return attr_str;
+}
+function spread_props(props) {
+  const merged_props = {};
+  let key;
+  for (let i = 0; i < props.length; i++) {
+    const obj = props[i];
+    for (key in obj) {
+      const desc = Object.getOwnPropertyDescriptor(obj, key);
+      if (desc) {
+        Object.defineProperty(merged_props, key, desc);
+      } else {
+        merged_props[key] = obj[key];
+      }
+    }
+  }
+  return merged_props;
 }
 function stringify(value) {
   return typeof value === "string" ? value : value == null ? "" : value + "";
@@ -1615,7 +1639,7 @@ function ensure_array_like(array_like_or_iterator) {
   return [];
 }
 export {
-  sanitize_slots as $,
+  sanitize_props as $,
   mutable_source as A,
   render as B,
   push as C,
@@ -1639,15 +1663,17 @@ export {
   assign_payload as U,
   ensure_array_like as V,
   getContext as W,
-  rest_props as X,
-  fallback as Y,
-  slot as Z,
-  sanitize_props as _,
+  hash as X,
+  rest_props as Y,
+  fallback as Z,
+  slot as _,
   set_active_effect as a,
-  add_styles as a0,
-  noop as a1,
-  subscribe_to_store as a2,
-  safe_not_equal as a3,
+  sanitize_slots as a0,
+  add_styles as a1,
+  spread_props as a2,
+  noop as a3,
+  subscribe_to_store as a4,
+  safe_not_equal as a5,
   active_reaction as b,
   active_effect as c,
   define_property as d,

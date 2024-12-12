@@ -7,8 +7,8 @@ import "firebase/storage";
 import "firebase/analytics";
 import "firebase/database";
 import { w as writable } from "../../../chunks/index.js";
+import { g as getToastStore, b as getModalStore, P as ProgressRadial } from "../../../chunks/Toast.js";
 import "firebase/compat/app";
-import { P as ProgressRadial } from "../../../chunks/ProgressRadial.js";
 import "../../../chunks/client.js";
 function docStore(firestore2, ref, startWith) {
   let unsubscribe;
@@ -237,18 +237,66 @@ function Draw($$payload, $$props) {
 Draw.render = function() {
   throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
 };
+Image_add_fill[FILENAME] = "~icons/ri/image-add-fill.svelte";
+function Image_add_fill($$payload, $$props) {
+  push(Image_add_fill);
+  const { $$slots, $$events, ...p } = $$props;
+  $$payload.out += `<svg${spread_attributes(
+    {
+      viewBox: "0 0 24 24",
+      width: "1.2em",
+      height: "1.2em",
+      ...p
+    },
+    void 0,
+    void 0,
+    3
+  )}>`;
+  push_element($$payload, "svg", 1, 37);
+  $$payload.out += `<path fill="currentColor" d="M21 15v3h3v2h-3v3h-2v-3h-3v-2h3v-3zm.008-12c.548 0 .992.445.992.993v9.349A6 6 0 0 0 20 13V5H4l.001 14l9.292-9.293a1 1 0 0 1 1.32-.084l.094.085l3.545 3.55a6.003 6.003 0 0 0-3.91 7.743L2.992 21A.993.993 0 0 1 2 20.007V3.993A1 1 0 0 1 2.992 3zM8 7a2 2 0 1 1 0 4a2 2 0 0 1 0-4">`;
+  push_element($$payload, "path", 1, 99);
+  $$payload.out += `</path>`;
+  pop_element();
+  $$payload.out += `</svg>`;
+  pop_element();
+  pop();
+}
+Image_add_fill.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
+Image$1[FILENAME] = "src/lib/Components/Toolbar/Items/Image.svelte";
+function Image$1($$payload, $$props) {
+  push(Image$1);
+  let { active = void 0, url = void 0 } = $$props;
+  let activeClass = "border-2 border-slate-900 !bg-opacity-0";
+  $$payload.out += `<button type="button"${attr("class", activeClass)}>`;
+  push_element($$payload, "button", 22, 0);
+  Image_add_fill($$payload, {});
+  $$payload.out += `<!----></button>`;
+  pop_element();
+  bind_props($$props, { active, url });
+  pop();
+}
+Image$1.render = function() {
+  throw new Error("Component.render(...) is no longer valid in Svelte 5. See https://svelte.dev/docs/svelte/v5-migration-guide#Components-are-no-longer-classes for more information");
+};
 Toolbar[FILENAME] = "src/lib/Components/Toolbar/Toolbar.svelte";
 function Toolbar($$payload, $$props) {
   push(Toolbar);
-  let { selectedTool = "click" } = $$props;
+  let {
+    selectedTool = "click",
+    toolOptions = void 0
+  } = $$props;
   let clickActive = true;
   let drawActive = false;
+  let imageActive = false;
+  let imageURL = "";
   let drawPencil = true;
   let $$settled = true;
   let $$inner_payload;
   function $$render_inner($$payload2) {
     $$payload2.out += `<div class="flex flex-col mr-2 p-1 bg-surface-50 bg-opacity-30 border rounded backdrop-blur-3xl">`;
-    push_element($$payload2, "div", 32, 0);
+    push_element($$payload2, "div", 55, 0);
     Click($$payload2, {
       get active() {
         return clickActive;
@@ -275,6 +323,23 @@ function Toolbar($$payload, $$props) {
         $$settled = false;
       }
     });
+    $$payload2.out += `<!----> `;
+    Image$1($$payload2, {
+      get active() {
+        return imageActive;
+      },
+      set active($$value) {
+        imageActive = $$value;
+        $$settled = false;
+      },
+      get url() {
+        return imageURL;
+      },
+      set url($$value) {
+        imageURL = $$value;
+        $$settled = false;
+      }
+    });
     $$payload2.out += `<!----></div>`;
     pop_element();
   }
@@ -284,7 +349,7 @@ function Toolbar($$payload, $$props) {
     $$render_inner($$inner_payload);
   } while (!$$settled);
   assign_payload($$payload, $$inner_payload);
-  bind_props($$props, { selectedTool });
+  bind_props($$props, { selectedTool, toolOptions });
   pop();
 }
 Toolbar.render = function() {
@@ -293,6 +358,8 @@ Toolbar.render = function() {
 DreamConnection[FILENAME] = "src/lib/Components/DreamConnection.svelte";
 function DreamConnection($$payload, $$props) {
   push(DreamConnection);
+  const toastStore = getToastStore();
+  let modalStore = getModalStore();
   let { call, localStream, remove = void 0 } = $$props;
   let media = null;
   call.pc.ontrack = (e) => {
@@ -313,6 +380,7 @@ function DreamConnection($$payload, $$props) {
     }
   };
   let selectedTool = "click";
+  let toolOptions = {};
   let MouseDown = (e) => {
     let data = {
       type: "BasicInput",
@@ -326,6 +394,12 @@ function DreamConnection($$payload, $$props) {
     sendData(data);
     console.log("DreamConnection: Mouse down");
   };
+  const getMeta = (url, err, cb) => {
+    const img = new Image();
+    img.onload = () => cb(img);
+    img.onerror = err;
+    img.src = url;
+  };
   let MouseUp = (e) => {
     let data = {
       type: "BasicInput",
@@ -336,6 +410,47 @@ function DreamConnection($$payload, $$props) {
       x: e.offsetX / e.target.clientWidth,
       y: e.offsetY / e.target.clientHeight
     };
+    if (selectedTool == "image") {
+      modalStore.trigger({
+        type: "prompt",
+        // Data
+        title: "Enter Name",
+        body: "Provide your first name in the field below.",
+        valueAttr: {
+          type: "url",
+          required: true,
+          placeholder: "Enter URL",
+          class: "modal-prompt-input input p-2"
+        },
+        // Returns the updated response value
+        response: (r) => {
+          getMeta(
+            r,
+            () => {
+              toastStore.trigger({
+                message: "Invalid URL",
+                background: "variant-filled-error"
+              });
+            },
+            (img) => {
+              let offsetX = e.offsetX - img.naturalWidth / 2;
+              let offsetY = e.offsetY - img.naturalHeight / 2;
+              data = {
+                type: "AdvancedInput",
+                class: "Object",
+                action: "create",
+                objectType: "image",
+                src: r,
+                x: offsetX / e.target.clientWidth,
+                y: offsetY / e.target.clientHeight
+              };
+              sendData(data);
+            }
+          );
+        }
+      });
+      return;
+    }
     sendData(data);
     console.log("DreamConnection: Mouse up");
   };
@@ -369,6 +484,7 @@ function DreamConnection($$payload, $$props) {
     console.log("DreamConnection: Scrolled");
   };
   function KeyEvent(e, down) {
+    if (selectedTool == "image") return;
     let data = {
       type: "BasicInput",
       device: "keyboard",
@@ -389,6 +505,13 @@ function DreamConnection($$payload, $$props) {
         },
         set selectedTool($$value) {
           selectedTool = $$value;
+          $$settled = false;
+        },
+        get toolOptions() {
+          return toolOptions;
+        },
+        set toolOptions($$value) {
+          toolOptions = $$value;
           $$settled = false;
         }
       });

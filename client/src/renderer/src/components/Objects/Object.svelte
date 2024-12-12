@@ -26,6 +26,9 @@
     return false
   }
   export function SetHover(color: string | undefined) {
+    if(colorStyle != "" && color != null) {
+      return;
+    }
     if (color != null) {
       colorStyle = 'border: 2px solid ' + color
     } else {

@@ -5,6 +5,9 @@
     import Toolbar from "./Toolbar/Toolbar.svelte";
     import type { ModalSettings } from "@skeletonlabs/skeleton";
     import { getModalStore } from "@skeletonlabs/skeleton";
+    import { getToastStore } from "@skeletonlabs/skeleton";
+
+    const toastStore = getToastStore();
     interface DreamConnectionProps {
         call: MyPeerConnection;
         localStream?: MediaStream | null;
@@ -108,10 +111,14 @@
         sendData(data);
         console.log("DreamConnection: Mouse down");
     };
-    const getMeta = (url: string, cb: (img: HTMLImageElement) => void) => {
+    const getMeta = (
+        url: string,
+        err: () => void,
+        cb: (img: HTMLImageElement) => void,
+    ) => {
         const img = new Image();
         img.onload = () => cb(img);
-        //img.onerror = (err) => cb(err);
+        img.onerror = err;
         img.src = url;
     };
     let MouseUp = (e: MouseEvent) => {
@@ -130,29 +137,43 @@
                 // Data
                 title: "Enter Name",
                 body: "Provide your first name in the field below.",
-                // Populates the input value and attributes
-                value: "(url)",
 
                 valueAttr: {
                     type: "url",
                     required: true,
+                    placeholder: "Enter URL",
+                    class: "modal-prompt-input input p-2",
                 },
                 // Returns the updated response value
                 response: (r: string) => {
-                    getMeta(r, (img) => {
-                        let offsetX = e.offsetX - img.naturalWidth / 2;
-                        let offsetY = e.offsetY - img.naturalHeight / 2;
-                        data = {
-                            type: "AdvancedInput",
-                            class: "Object",
-                            action: "create",
-                            objectType: "image",
-                            src: r,
-                            x: offsetX / (e.target as HTMLElement).clientWidth,
-                            y: offsetY / (e.target as HTMLElement).clientHeight,
-                        };
-                        sendData(data);
-                    });
+                    getMeta(
+                        r,
+                        () => {
+                            toastStore.trigger({
+                                message: "Invalid URL",
+                                background:"variant-filled-error",
+                            });
+                        },
+
+                        (img) => {
+                            let offsetX = e.offsetX - img.naturalWidth / 2;
+                            let offsetY = e.offsetY - img.naturalHeight / 2;
+                            data = {
+                                type: "AdvancedInput",
+                                class: "Object",
+                                action: "create",
+                                objectType: "image",
+                                src: r,
+                                x:
+                                    offsetX /
+                                    (e.target as HTMLElement).clientWidth,
+                                y:
+                                    offsetY /
+                                    (e.target as HTMLElement).clientHeight,
+                            };
+                            sendData(data);
+                        },
+                    );
                 },
             });
             return;
@@ -216,6 +237,7 @@
 {#if media != null}
     <Toolbar bind:selectedTool bind:toolOptions />
     <Dream
+
         interarctive={false}
         stream={media}
         local={false}

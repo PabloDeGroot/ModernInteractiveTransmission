@@ -37,15 +37,15 @@ function createWindow(): void {
       sandbox: false
     }
   })
-  /*
-    mainWindow.setAlwaysOnTop(true);
-    mainWindow.setIgnoreMouseEvents(true);
-    mainWindow.setFullScreenable(false);
-    mainWindow.setKiosk(true);
-    mainWindow.setMenu(null);
-    mainWindow.setMovable(false);
-    mainWindow.setFocusable(false);
-  */
+
+  mainWindow.setAlwaysOnTop(true);
+  mainWindow.setIgnoreMouseEvents(true);
+  mainWindow.setFullScreenable(false);
+  mainWindow.setKiosk(true);
+  mainWindow.setMenu(null);
+  mainWindow.setMovable(false);
+  mainWindow.setFocusable(false);
+
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })

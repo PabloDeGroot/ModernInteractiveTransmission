@@ -7,7 +7,7 @@
     import { goto } from "$app/navigation";
 
     import { FirebaseApp, SignedIn } from "sveltefire";
-    import { AppShell, Avatar, initializeStores, LightSwitch, Modal } from "@skeletonlabs/skeleton";
+    import { AppShell, Avatar, initializeStores, LightSwitch, Modal, Toast } from "@skeletonlabs/skeleton";
     import { onNavigate, afterNavigate } from "$app/navigation";
     import { cubicInOut, cubicOut } from "svelte/easing";
     let { children } = $props();
@@ -32,7 +32,7 @@
     //gradient.initGradient("#gradient-canvas");
     let canvas = $state<HTMLCanvasElement>();
     $effect(() => {
-        //gradient.initGradient("#gradient-canvas");
+        gradient.initGradient("#gradient-canvas");
     });
     let headerClass = $state("p-4");
     $effect(() => {
@@ -66,6 +66,7 @@
 </script>
 
 <Modal />
+<Toast />
 
 <FirebaseApp {auth} {firestore}>
     <div class="dream flex flex-col items-center w-full h-screen">

@@ -2,7 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getDatabase } from "firebase/database";
-import { E as setContext, W as getContext, F as FILENAME, C as push, Y as fallback, Z as slot, R as bind_props, G as pop, I as store_get, J as unsubscribe_stores } from "./index2.js";
+import { E as setContext, W as getContext, F as FILENAME, C as push, Z as fallback, _ as slot, R as bind_props, G as pop, I as store_get, J as unsubscribe_stores } from "./index2.js";
 import { w as writable } from "./index.js";
 let firebaseConfig = {
   apiKey: "AIzaSyBBtp0X-mJVTRHKFBMwt2_3pxIbfhhz_ak",

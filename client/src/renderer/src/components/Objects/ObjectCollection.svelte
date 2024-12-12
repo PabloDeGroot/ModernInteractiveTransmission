@@ -18,6 +18,12 @@
     let obj = objects.find((obj) => obj.IsOver(x, y))
     return obj
   }
+  export function Clear() {
+    objecsProps = []
+    objects = []
+    
+
+  }
   $effect(() => {
     if (objects.length > 0) {
       console.log('Objects', objects)

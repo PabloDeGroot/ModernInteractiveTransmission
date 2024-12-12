@@ -1,4 +1,4 @@
-import { F as FILENAME, C as push, I as store_get, J as unsubscribe_stores, G as pop, K as push_element, M as invalid_default_snippet, N as attr, O as pop_element, P as escape_html, Q as stringify } from "../../chunks/index2.js";
+import { E as setContext, F as FILENAME, C as push, I as store_get, J as unsubscribe_stores, G as pop, K as push_element, M as invalid_default_snippet, N as attr, O as pop_element, P as escape_html, Q as stringify } from "../../chunks/index2.js";
 import { a as auth, F as FirebaseApp, f as firestore, S as SignedIn } from "../../chunks/SignedOut.js";
 import { p as page } from "../../chunks/stores.js";
 import { g as goto } from "../../chunks/client.js";
@@ -7,7 +7,8 @@ import "firebase/firestore";
 import "firebase/storage";
 import "firebase/analytics";
 import "firebase/database";
-import { A as Avatar } from "../../chunks/ProgressRadial.js";
+import { i as initializeModalStore, a as initializeToastStore, M as Modal, T as Toast, A as Avatar } from "../../chunks/Toast.js";
+import { w as writable } from "../../chunks/index.js";
 function normalizeColor(hexCode) {
   return [(hexCode >> 16 & 255) / 255, (hexCode >> 8 & 255) / 255, (255 & hexCode) / 255];
 }
@@ -473,6 +474,33 @@ class Gradient {
     this.sectionColors = this.sectionColors.filter(Boolean).map(normalizeColor);
   }
 }
+const DRAWER_STORE_KEY = "drawerStore";
+function initializeDrawerStore() {
+  const drawerStore = drawerService();
+  return setContext(DRAWER_STORE_KEY, drawerStore);
+}
+function drawerService() {
+  const { subscribe, set, update } = writable({});
+  return {
+    subscribe,
+    set,
+    update,
+    /** Open the drawer. */
+    open: (newSettings) => update(() => {
+      return { open: true, ...newSettings };
+    }),
+    /** Close the drawer. */
+    close: () => update((d) => {
+      d.open = false;
+      return d;
+    })
+  };
+}
+function initializeStores() {
+  initializeModalStore();
+  initializeToastStore();
+  initializeDrawerStore();
+}
 _layout[FILENAME] = "src/routes/+layout.svelte";
 function _layout($$payload, $$props) {
   push(_layout);
@@ -501,24 +529,29 @@ function _layout($$payload, $$props) {
       }
     });
   }
+  initializeStores();
+  Modal($$payload, {});
+  $$payload.out += `<!----> `;
+  Toast($$payload, {});
+  $$payload.out += `<!----> `;
   FirebaseApp($$payload, {
     auth,
     firestore,
     children: ($$payload2) => {
       $$payload2.out += `<div class="dream flex flex-col items-center w-full h-screen">`;
-      push_element($$payload2, "div", 67, 4);
+      push_element($$payload2, "div", 72, 4);
       SignedIn($$payload2, {
         children: invalid_default_snippet,
         $$slots: {
           default: ($$payload3, { auth: auth2, signOut, user }) => {
             $$payload3.out += `<header${attr("class", `transition-all flex items-center ${stringify(headerClass)} w-full bg-surface-700 bg-opacity-70 drop-shadow-lg backdrop-blur-md`)}>`;
-            push_element($$payload3, "header", 69, 12);
+            push_element($$payload3, "header", 74, 12);
             if (ready) {
               $$payload3.out += "<!--[-->";
               $$payload3.out += `<div class="flex items-center justify-between flex-1">`;
-              push_element($$payload3, "div", 73, 20);
+              push_element($$payload3, "div", 78, 20);
               $$payload3.out += `<div class="flex items-center">`;
-              push_element($$payload3, "div", 74, 24);
+              push_element($$payload3, "div", 79, 24);
               if (user.photoURL != null) {
                 $$payload3.out += "<!--[-->";
                 Avatar($$payload3, {
@@ -534,13 +567,13 @@ function _layout($$payload, $$props) {
               if (user.displayName != null && !minimize) {
                 $$payload3.out += "<!--[-->";
                 $$payload3.out += `<div>`;
-                push_element($$payload3, "div", 84, 32);
+                push_element($$payload3, "div", 89, 32);
                 $$payload3.out += `<span class="text-lg">`;
-                push_element($$payload3, "span", 85, 36);
+                push_element($$payload3, "span", 90, 36);
                 $$payload3.out += `Welcome</span>`;
                 pop_element();
                 $$payload3.out += `<span class="text-lg font-bold pl-1">`;
-                push_element($$payload3, "span", 85, 73);
+                push_element($$payload3, "span", 90, 73);
                 $$payload3.out += `${escape_html(user.displayName)}</span>`;
                 pop_element();
                 $$payload3.out += `</div>`;
@@ -551,9 +584,9 @@ function _layout($$payload, $$props) {
               $$payload3.out += `<!--]--></div>`;
               pop_element();
               $$payload3.out += ` <button type="button" class="btn-icon variant-filled-primary">`;
-              push_element($$payload3, "button", 92, 24);
+              push_element($$payload3, "button", 97, 24);
               $$payload3.out += `<span class="material-symbols-outlined">`;
-              push_element($$payload3, "span", 97, 28);
+              push_element($$payload3, "span", 102, 28);
               $$payload3.out += `logout</span>`;
               pop_element();
               $$payload3.out += `</button>`;
@@ -569,12 +602,12 @@ function _layout($$payload, $$props) {
         }
       });
       $$payload2.out += `<!----> <div class="flex flex-col items-center justify-center overflow-auto h-full w-full">`;
-      push_element($$payload2, "div", 105, 8);
+      push_element($$payload2, "div", 110, 8);
       children($$payload2);
       $$payload2.out += `<!----></div>`;
       pop_element();
       $$payload2.out += ` <canvas class="fixed top-0 left-0 w-full h-full -z-10 mix-blend-plus-darker svelte-ciik6g" id="gradient-canvas" data-js-darken-top="" data-transition-in="">`;
-      push_element($$payload2, "canvas", 111, 8);
+      push_element($$payload2, "canvas", 116, 8);
       $$payload2.out += `</canvas>`;
       pop_element();
       $$payload2.out += `</div>`;
@@ -582,6 +615,7 @@ function _layout($$payload, $$props) {
     },
     $$slots: { default: true }
   });
+  $$payload.out += `<!---->`;
   if ($$store_subs) unsubscribe_stores($$store_subs);
   pop();
 }

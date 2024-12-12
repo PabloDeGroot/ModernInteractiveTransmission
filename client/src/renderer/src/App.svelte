@@ -55,6 +55,9 @@
     if (canvas == null) return
     console.log('Clearing Canvas')
     canvas.Clear()
+    if (objectColection == null) return
+    console.log('Clearing Objects')
+    objectColection.Clear()
   })
   api.getUserId().then((data: any) => {
     userId = data

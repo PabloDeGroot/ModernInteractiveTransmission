@@ -61,7 +61,7 @@
     if (pressedObject != null && tool == 'click') {
       pressedObject.o.SetPosition(x - pressedObject.x, y - pressedObject.y)
     }
-    if (pressedObject != null && pressedObject.o != overObject) {
+    if (pressedObject != null && overObject == null) {
       // en teoria con esto si dos usarios agarran el mismo objeto se soluciona
       pressedObject = null
     }
@@ -76,10 +76,10 @@
     if (pressedObject != null) {
       pressedObject = null
       //pressedObject.o.SetHover(undefined)
-      return;
+      return
     }
     if (selectedTool == 'click') {
-      electronIpc.send('click', { x: posX, y: posY, button: button })
+      //electronIpc.send('click', { x: posX, y: posY, button: button })
     }
   }
   let MouseDown = (/*button: string*/) => {
@@ -126,7 +126,7 @@
       p.MouseDown = MouseDown
       p.MouseUp = MouseUp
       //p.Draw = Draw
-      p.IPC = electronIpc
+      //p.IPC = electronIpc
       p.Run()
     }
   })
