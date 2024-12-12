@@ -2,6 +2,8 @@
   import Pointer from '~icons/vaadin/cursor'
   import JamRubber from '~icons/jam/rubber'
   import BxsPencil from '~icons/bxs/pencil'
+  import RiImageAddFill from '~icons/ri/image-add-fill'
+
   interface CursorProps {
     x: number
     y: number
@@ -31,6 +33,8 @@
     <BxsPencil class="absolute origin-bottom-left" style={styles} />
   {:else if tool == 'rubber'}
     <JamRubber class="" style={styles} />
+  {:else if tool == 'image'}
+    <RiImageAddFill class="absolute origin-bottom-left" style={styles} />
   {:else}
     <Pointer class="absolute bottom-1 origin-top-left" style={styles} />
   {/if}

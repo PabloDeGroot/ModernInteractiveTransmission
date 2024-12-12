@@ -3,11 +3,11 @@
   import { Data, Create } from '../../types/Data'
   import Cursor from './Cursor.svelte'
   import { MyPeerConnection } from '../../WebRTC/MyPeer'
+  import Object from './Objects/Object.svelte'
 
   interface UserProps {
     connection: MyPeerConnection
     localStream: MediaStream
-    audio: MediaStream
     draw: (
       lastPos: { x: number; y: number },
       x: number,
@@ -15,17 +15,21 @@
       color: string,
       button: string
     ) => void
+    getObject: (x: number, y: number) => Object | null
+    createObject: (x: number, y: number, type: 'image' | 'text', src?: string) => void
   }
   let lastPosDraw = $state<{ x: number; y: number } | null>(null)
   let selectedTool = $state<'draw' | 'rubber' | 'click'>('click')
   let pressedMouse = $state(false)
 
-  let { connection, localStream, draw }: UserProps = $props()
+  let { connection, localStream, draw, getObject, createObject }: UserProps = $props()
   let posX = $state(0)
   let posY = $state(0)
   let color = $state<string | undefined>(null)
   let username = $state('')
   let electronIpc = (window as any).electron.ipcRenderer as Electron.IpcRenderer
+  let overObject = $state<Object | null>(null)
+  let pressedObject = $state<{ o: Object; x: number; y: number } | null>(null)
   $effect(() => {
     localStream.getTracks().forEach((track) => {
       connection.pc.addTrack(track, localStream)
@@ -46,19 +50,45 @@
         Draw(x, y, tool)
       }
     }
+    let oldObject = overObject
+    overObject = getObject(x, y)
+    if (overObject != null) {
+      console.log('OVER:', overObject)
+    }
+    if (overObject != null && tool == 'click') {
+      overObject.SetHover(color)
+    }
+    if (pressedObject != null && tool == 'click') {
+      pressedObject.o.SetPosition(x - pressedObject.x, y - pressedObject.y)
+    }
+    if (pressedObject != null && pressedObject.o != overObject) {
+      // en teoria con esto si dos usarios agarran el mismo objeto se soluciona
+      pressedObject = null
+    }
+    if (oldObject != null && oldObject != overObject) {
+      oldObject.SetHover(undefined)
+    }
   }
   let MouseUp = (button: string) => {
     pressedMouse = false
     lastPosDraw = null
+
+    if (pressedObject != null) {
+      pressedObject = null
+      //pressedObject.o.SetHover(undefined)
+      return;
+    }
     if (selectedTool == 'click') {
       electronIpc.send('click', { x: posX, y: posY, button: button })
     }
-    if (selectedTool == 'draw') {
-      lastPosDraw = null
-    }
   }
-  let MouseDown = (button: string) => {
+  let MouseDown = (/*button: string*/) => {
     pressedMouse = true
+    if (overObject != null) {
+      let offsetX = posX - overObject.x
+      let offsetY = posY - overObject.y
+      pressedObject = { o: overObject, x: offsetX, y: offsetY }
+    }
     //button = "";
   }
   let Draw = (x: number, y: number, button: string) => {
@@ -73,7 +103,9 @@
     draw(lastPosDraw, x, y, color, button)
     lastPosDraw = { x, y }
   }
-  let CreateObject = () => {}
+  let CreateObject = (x: number, y: number, type: 'image' | 'text', src?: string) => {
+    createObject(x, y, type, src)
+  }
 
   $effect(() => {
     if (connection == null) return

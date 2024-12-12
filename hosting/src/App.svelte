@@ -10,6 +10,7 @@
   import "firebase/performance";
   import "firebase/analytics";
   import { getAuth } from "firebase/auth";
+  import { initializeStores, Modal } from "@skeletonlabs/skeleton";
 
   let firebaseConfig = {
     apiKey: "AIzaSyBBtp0X-mJVTRHKFBMwt2_3pxIbfhhz_ak",
@@ -23,7 +24,6 @@
   let app = initializeApp(firebaseConfig);
   let firestore = getFirestore(app);
   let auth = getAuth(app);
-
 
 </script>
 

@@ -81,7 +81,6 @@ export class MyPeerConnection {
             this.registerListeners();
 
             this.pc.ondatachannel = ((e) => {
-
                 console.log("My Peer: Data channel created", e.channel);
             });
             this.data.onclose = () => {

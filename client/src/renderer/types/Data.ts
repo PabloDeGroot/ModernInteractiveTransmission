@@ -7,9 +7,15 @@ export abstract class Data {
     color: string
     MoveMouse!: (x: number, y: number, selectedTool: string) => void
     Draw!: (x: number, y: number, button: string) => void
-    CreateObject!: () => void
+    CreateObject!: (x: number, y: number, type: 'image' | 'text', src?: string) => void
     MouseUp!: (button: string) => void
     MouseDown!: (button: string) => void
+    AddText = (text: string, x: number, y: number) => {
+        this.CreateObject(x, y, "text", text)
+    }
+    AddImage = (src: string, x: number, y: number) => {
+        this.CreateObject(x, y, "image", src)
+    }
     abstract Run: () => void
 
 }
@@ -47,7 +53,7 @@ export class ClickInput extends MouseInput {
         if (this.pressed) {
             //this.IPC.send("clickMouse", { x: this.x, y: this.y, type: this.button })
             this.MouseDown(this.button)
-        }else{
+        } else {
             this.MouseUp(this.button)
         }
     }
@@ -118,18 +124,22 @@ abstract class ObjectInput extends AdvancedInput {
     y!: number
 }
 export class ImageInput extends ObjectInput {
-    declare action: "create" | "destroy" | "move"
-    Run = () => { }
+    declare action: "create"
+    Run = () => { this.AddImage(this.src, this.x, this.y) }
     declare objectType: "image"
-    src: string
-    constructor(src: string) {
+    src?: string
+    constructor(src: string, x: number, y: number) {
         super()
+        let screenWidth = window.screen.width
+        let screenHeight = window.screen.height
+        this.x = x * screenWidth
+        this.y = y * screenHeight
         this.src = src
     }
 }
 export class TextInput extends ObjectInput {
-    declare action: "create" | "destroy" | "move"
-    Run = () => { }
+    declare action: "create"
+    Run = () => { this.AddText(this.text, this.x, this.y) }
     declare objectType: "text"
     text: string
     constructor(text: string) {
@@ -189,9 +199,10 @@ function CreateAdvancedInput(data: AdvancedInput) {
     }
 }
 function CreateObjectInput(data: any) {
+    console.log(data)
     switch (data.objectType) {
         case "image":
-            return new ImageInput(data.src)
+            return new ImageInput(data.src, data.x, data.y)
         case "text":
             return new TextInput(data.text)
         default:

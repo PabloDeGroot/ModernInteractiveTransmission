@@ -3,6 +3,8 @@
   import { FirestoreCallChannel } from '../WebRTC/FirestoreCallChannel'
   import MyPeer, { MyPeerConnection } from '../WebRTC/MyPeer'
   import Canvas from './components/Canvas.svelte'
+  import Object from './components/Objects/Object.svelte'
+  import ObjectCollection from './components/Objects/ObjectCollection.svelte'
   import Presence from './components/Presence.svelte'
   import User from './components/User.svelte'
 
@@ -68,6 +70,15 @@
     if (canvas == null) return
     canvas.Draw(lastPos, x, y, color, 10, button)
   }
+  let getObject: (x: number, y: number) => Object | null = (x: number, y: number) => {
+    if (objectColection == null) return null
+    return objectColection.GetAtPosition(x, y)
+  }
+  let createObject = (x: number, y: number, type: 'image' | 'text', src?: string) => {
+    if (objectColection == null) return
+    objectColection.CreateObject(type, x, y, src)
+  }
+  let objectColection = $state<ObjectCollection | null>(null)
   // Get Monitor Stream
   // Call every user in the room
   // Create User component and pass the connection
@@ -78,9 +89,10 @@
 {/if}
 {#if conns.length > 0 && media != null}
   {#each conns as conn}
-    <User connection={conn} localStream={media} {draw} />
+    <User connection={conn} localStream={media} {draw} {getObject} {createObject} />
   {/each}
 {/if}
 {#if media != null}
   <Canvas bind:this={canvas} />
 {/if}
+<ObjectCollection bind:this={objectColection} />

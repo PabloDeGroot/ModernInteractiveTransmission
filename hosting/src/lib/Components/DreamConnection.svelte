@@ -3,11 +3,14 @@
     import type { Call } from "../../types/Call";
     import type { MyPeerConnection } from "$lib/WebRTC/MyPeer";
     import Toolbar from "./Toolbar/Toolbar.svelte";
+    import type { ModalSettings } from "@skeletonlabs/skeleton";
+    import { getModalStore } from "@skeletonlabs/skeleton";
     interface DreamConnectionProps {
         call: MyPeerConnection;
         localStream?: MediaStream | null;
         remove?: (redial: boolean) => void;
     }
+    let modalStore = getModalStore();
     let {
         call,
         localStream,
@@ -41,7 +44,8 @@
             call.data.send(JSON.stringify(data));
         }
     };
-    let selectedTool = $state<"click" | "rubber" | "draw">("click");
+    let selectedTool = $state<"click" | "rubber" | "draw" | "image">("click");
+    let toolOptions = $state<any>({});
     // $effect(() => {
     //     call.call.on("stream", (remoteStream) => {
     //         console.log("DreamConnection: Stream received", remoteStream);
@@ -99,9 +103,16 @@
             pressed: true,
             x: e.offsetX / (e.target as HTMLElement).clientWidth,
             y: e.offsetY / (e.target as HTMLElement).clientHeight,
-        };
+        } as any;
+
         sendData(data);
         console.log("DreamConnection: Mouse down");
+    };
+    const getMeta = (url: string, cb: (img: HTMLImageElement) => void) => {
+        const img = new Image();
+        img.onload = () => cb(img);
+        //img.onerror = (err) => cb(err);
+        img.src = url;
     };
     let MouseUp = (e: MouseEvent) => {
         let data = {
@@ -112,7 +123,42 @@
             pressed: false,
             x: e.offsetX / (e.target as HTMLElement).clientWidth,
             y: e.offsetY / (e.target as HTMLElement).clientHeight,
-        };
+        } as any;
+        if (selectedTool == "image") {
+            modalStore.trigger({
+                type: "prompt",
+                // Data
+                title: "Enter Name",
+                body: "Provide your first name in the field below.",
+                // Populates the input value and attributes
+                value: "(url)",
+
+                valueAttr: {
+                    type: "url",
+                    required: true,
+                },
+                // Returns the updated response value
+                response: (r: string) => {
+                    getMeta(r, (img) => {
+                        let offsetX = e.offsetX - img.naturalWidth / 2;
+                        let offsetY = e.offsetY - img.naturalHeight / 2;
+                        data = {
+                            type: "AdvancedInput",
+                            class: "Object",
+                            action: "create",
+                            objectType: "image",
+                            src: r,
+                            x: offsetX / (e.target as HTMLElement).clientWidth,
+                            y: offsetY / (e.target as HTMLElement).clientHeight,
+                        };
+                        sendData(data);
+                    });
+                },
+            });
+            return;
+            //console.log("DreamConnection: Image selected", toolOptions);
+            //if (toolOptions.url == null) return;
+        }
         sendData(data);
         console.log("DreamConnection: Mouse up");
     };
@@ -149,6 +195,7 @@
         console.log("DreamConnection: Scrolled");
     };
     export function KeyEvent(e: KeyboardEvent, down: boolean) {
+        if (selectedTool == "image") return;
         let data = {
             type: "BasicInput",
             device: "keyboard",
@@ -167,7 +214,7 @@
 </script>
 
 {#if media != null}
-    <Toolbar bind:selectedTool={selectedTool} />
+    <Toolbar bind:selectedTool bind:toolOptions />
     <Dream
         interarctive={false}
         stream={media}
