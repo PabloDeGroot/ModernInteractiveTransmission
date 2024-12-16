@@ -149,8 +149,7 @@ app.whenReady().then(() => {
 
   });
   ipcMain.on("move", async (event, arg) => {
-    console.log("moveMouse");
-    console.log(arg);
+
     sendMouseMoveAt(arg.x, arg.y);
     event.reply("moveMouse", "done");
   });
