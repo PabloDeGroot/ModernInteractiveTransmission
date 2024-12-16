@@ -1,0 +1,18 @@
+{
+  "name": "webrtc_rust_client-win32-x64-msvc",
+  "version": "0.0.0",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "main": "webrtc_rust_client.win32-x64-msvc.node",
+  "files": [
+    "webrtc_rust_client.win32-x64-msvc.node"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">= 10"
+  }
+}

@@ -7,7 +7,7 @@ import MenuBuilder from './menu'
 import { Button, mouse, keyboard, KeyboardClass, Key } from "@nut-tree-fork/nut-js"
 import { k } from 'vite/dist/node/types.d-aGj9QkWt'
 import { on } from 'events'
-import { sendLeftClickAt, sendRightClickAt, sendMiddleClickAt } from "@pablodegroot/virtual_input"
+import { sendLeftClickAt, sendRightClickAt, sendMiddleClickAt, sendMouseMoveAt } from "@pablodegroot/virtual_input"
 const path = require('path')
 let mainWindow: BrowserWindow | null = null
 let onMainWindow: ((mainWindow: BrowserWindow) => void) | null = null;
@@ -147,6 +147,12 @@ app.whenReady().then(() => {
     */
     event.reply("clickMouse", "done");
 
+  });
+  ipcMain.on("move", async (event, arg) => {
+    console.log("moveMouse");
+    console.log(arg);
+    sendMouseMoveAt(arg.x, arg.y);
+    event.reply("moveMouse", "done");
   });
 
   ipcMain.on('sendKey', async (event, arg: { key: string, pressed: boolean }) => {

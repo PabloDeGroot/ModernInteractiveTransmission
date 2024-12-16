@@ -15,6 +15,9 @@ const api = {
   clickMouse(x: number, y: number, type: string) {
     ipcRenderer.send('clickMouse', { x: x, y: y, type: type });
   },
+  moveMouse(x: number, y: number) {
+    ipcRenderer.send('moveMouse', { x: x, y: y });
+  },
   //ipcMain.on('keyDown', async (event, arg) => {
   keyDown(key: string) {
     ipcRenderer.send('keyDown', { key: key });

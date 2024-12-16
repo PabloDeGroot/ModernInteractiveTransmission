@@ -167,12 +167,7 @@ export class MyPeerConnection {
     initSignaling = async () => {
         this.signaler.onmessage = async ({ description, candidate, id, color, name }) => {
             console.log("My Peer: Signaling message", description, candidate, id);
-            if (id !== this.target) {
-                return;
-            }
-            if (id === this.id) {
-                return;
-            }
+
             this.targetName = name;
             this.targetColor = color;
             let polite = this.caller;//id < this.id;

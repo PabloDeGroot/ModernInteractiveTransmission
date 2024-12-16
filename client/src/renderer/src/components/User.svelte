@@ -50,6 +50,7 @@
         Draw(x, y, tool)
       }
     }
+
     let oldObject = overObject
     overObject = getObject(x, y)
     if (overObject != null) {
@@ -67,6 +68,9 @@
     }
     if (oldObject != null && oldObject != overObject) {
       oldObject.SetHover(undefined)
+    }
+    if (overObject == null) {
+      electronIpc.send('move', { x: x, y: y })
     }
   }
   let MouseUp = (button: string) => {

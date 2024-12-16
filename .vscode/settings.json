@@ -1,0 +1,10 @@
+{
+    "rust-analyzer.linkedProjects": [
+        "rust_modules/virtual_input/Cargo.toml",
+        "rust_modules/webrtc_rust_client/Cargo.toml",
+    ],
+    "rust-analyzer.procMacro.ignored": {
+        "webrtc_rust_client": ["napi"]
+    }
+    
+}
