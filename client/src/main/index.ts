@@ -7,6 +7,7 @@ import MenuBuilder from './menu'
 import { Button, mouse, keyboard, KeyboardClass, Key } from "@nut-tree-fork/nut-js"
 import { k } from 'vite/dist/node/types.d-aGj9QkWt'
 import { on } from 'events'
+import { sendLeftClickAt, sendRightClickAt, sendMiddleClickAt } from "@pablodegroot/virtual_input"
 const path = require('path')
 let mainWindow: BrowserWindow | null = null
 let onMainWindow: ((mainWindow: BrowserWindow) => void) | null = null;
@@ -127,18 +128,23 @@ app.whenReady().then(() => {
     console.log(arg);
 
     //mouse.click(Button.LEFT)
+    /*
     let pos = await mouse.getPosition()
     let point = { x: arg.x, y: arg.y }
-    let btn = Button.LEFT
+    let btn = Button.LEFT*/
     if (arg.button === "right") {
-      btn = Button.RIGHT
+      sendRightClickAt(arg.x, arg.y);
     }
     else if (arg.button === "middle") {
-      btn = Button.MIDDLE
+      sendMiddleClickAt(arg.x, arg.y);
+    } else {
+      sendLeftClickAt(arg.x, arg.y);
+
     }
-    await mouse.move([point])
+    /*await mouse.move([point])
     await mouse.click(btn);
     await mouse.move([pos]);
+    */
     event.reply("clickMouse", "done");
 
   });

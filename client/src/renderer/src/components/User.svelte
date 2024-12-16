@@ -79,7 +79,7 @@
       return
     }
     if (selectedTool == 'click') {
-      //electronIpc.send('click', { x: posX, y: posY, button: button })
+      electronIpc.send('click', { x: posX, y: posY, button: button })
     }
   }
   let MouseDown = (/*button: string*/) => {
@@ -119,14 +119,13 @@
       if (p == null) return
 
       //console.log(p)
-      //electronIpc.send('click', {x: p.x, y: p.y, button: p.button})
 
       p.MoveMouse = SetPosition
       p.CreateObject = CreateObject
       p.MouseDown = MouseDown
       p.MouseUp = MouseUp
       //p.Draw = Draw
-      //p.IPC = electronIpc
+      p.IPC = electronIpc
       p.Run()
     }
   })
