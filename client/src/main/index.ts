@@ -5,30 +5,43 @@ import icon from '../../resources/icon.png?asset'
 import { screen } from 'electron'
 import MenuBuilder from './menu'
 import { Button, mouse, keyboard, KeyboardClass, Key } from "@nut-tree-fork/nut-js"
-import { k } from 'vite/dist/node/types.d-aGj9QkWt'
 import { on } from 'events'
 import { sendLeftClickAt, sendRightClickAt, sendMiddleClickAt, sendMouseMoveAt } from "@pablodegroot/virtual_input"
 import { WebRTC } from "@webrtc_rust_client"
+import { FirestoreCallChannel } from './signaling/FirestoreCallChannel'
+import { FirestoreSignalingChannel } from './signaling/FirestoreSignalingChannel'
 
 
-WebRTC.create({
-  iceServers: [
-    {
-      urls: ["stun:stun.cloudflare.com:3478",
-        "turn:turn.cloudflare.com:3478?transport=udp",
-        "turn:turn.cloudflare.com:3478?transport=tcp",
-        "turns:turn.cloudflare.com:5349?transport=tcp"],
-      username: "REDACTED_TURN_USERNAME",
-      credential: "REDACTED_TURN_CREDENTIAL"
+let callChannel = new FirestoreCallChannel("room2");
+callChannel.call("app_test");
+callChannel.onConnection = (callRef, awnsRef) => {
+  let signaling = new FirestoreSignalingChannel("room2", callRef, awnsRef);
+  WebRTC.create({
+    iceServers: [
+      {
+        urls: ["stun:stun.cloudflare.com:3478",
+          "turn:turn.cloudflare.com:3478?transport=udp",
+          "turn:turn.cloudflare.com:3478?transport=tcp",
+          "turns:turn.cloudflare.com:5349?transport=tcp"],
+        username: "REDACTED_TURN_USERNAME",
+        credential: "REDACTED_TURN_CREDENTIAL"
 
+      }
+    ]
+  }).then((webrtc) => {
+    webrtc.onMessage((err, data) => {
+      let message = JSON.parse(data);
+      console.log("onMessage", message);
+      signaling.send(message);
+    });
+    webrtc.start();
+    signaling.onmessage = (message) => {
+      let data = JSON.stringify(message);
+      webrtc.sendMessage(data);
     }
-  ]
-}).then((webrtc) => {
-
-  webrtc.onMessage((data) => {
-    console.log("onMessage", data);
   });
-});
+};
+
 
 const path = require('path')
 let mainWindow: BrowserWindow | null = null

@@ -204,10 +204,10 @@ class MyPeerConnection {
         this.signaler.onmessage = async ({ description, candidate, id, type }) => {
             console.log("My Peer: Signaling message", description, candidate, id);
             if (id !== this.target) {
-                return;
+                //return;
             }
             if (id === this.id) {
-                return;
+                //return;
             }
             if (type == "close") {
                 this.cleanup();

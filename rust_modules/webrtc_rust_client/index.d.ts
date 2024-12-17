@@ -10,11 +10,11 @@ export declare class IceServer {
 }
 export declare class Configuration {
   iceServers: Array<IceServer>
-  constructor(iceServers: Array<IceServer>)
 }
 export type WebRtcClass = WebRTC
 export declare class WebRTC {
   static create(conf: Configuration): Promise<WebRtcClass>
   sendMessage(message: string): void
-  onMessage(callback: (...args: any[]) => any): void
+  onMessage(callback: (err:null|Error, result: string) => void): void
+  start(): Promise<void>
 }

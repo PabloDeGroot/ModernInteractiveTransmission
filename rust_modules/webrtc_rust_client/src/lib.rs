@@ -12,10 +12,13 @@ use std::{
 use napi::{
   bindgen_prelude::{spawn, FromNapiValue, ToNapiValue},
   sys,
-  threadsafe_function::{ThreadSafeCallContext, ThreadsafeFunction, ThreadsafeFunctionCallMode},
+  threadsafe_function::{
+    ErrorStrategy, ThreadSafeCallContext, ThreadsafeFunction, ThreadsafeFunctionCallMode,
+  },
   CallContext, Env, JsFunction, JsNumber, JsObject, JsString, JsUndefined, NapiValue, Property,
 };
 use notify::Result;
+use serde::Serialize;
 use webrtc::{
   api::{
     interceptor_registry::register_default_interceptors,
@@ -24,8 +27,7 @@ use webrtc::{
   },
   dtls::Error,
   ice_transport::{
-    ice_candidate::{RTCIceCandidate, RTCIceCandidateInit},
-    ice_server::RTCIceServer,
+    ice_candidate::{RTCIceCandidate, RTCIceCandidateInit}, ice_connection_state::RTCIceConnectionState, ice_server::RTCIceServer
   },
   interceptor::registry::Registry,
   media::{io::h264_reader::H264Reader, Sample},
@@ -58,6 +60,15 @@ extern crate napi_derive;
 // has onMessage that returns a Json
 // has onTrack that returns a track object
 // has onClose that returns void
+
+#[derive(Serialize, serde::Deserialize)]
+pub struct DecsWrapper {
+  pub description: RTCSessionDescription,
+}
+#[derive(Serialize, serde::Deserialize)]
+pub struct IceWrapper {
+  pub candidate: RTCIceCandidateInit,
+}
 
 #[napi]
 pub struct IceServer {
@@ -137,6 +148,7 @@ pub struct WebRtcClass {
 
 #[napi]
 impl WebRtcClass {
+  #[napi(factory)]
   pub async fn create(conf: Configuration) -> napi::Result<Self> {
     //let conf = ctx.get::<Configuration>(0)?;
 
@@ -182,16 +194,18 @@ impl WebRtcClass {
     Ok(web)
   }
   pub async fn init(&self) {
+    println!("Rust: init");
     // await offer from signaling server
     // let offer = await signaling.receive();
 
-    let video_file = Some("testbin/test.mp4");
+    let video_file = Some("C:/Users/pablo/Downloads/output.h264");
     let notify_video = Arc::new(tokio::sync::Notify::new());
 
     let (done_tx, mut done_rx) = tokio::sync::mpsc::channel::<()>(1);
 
     // add tracks
     if let Some(video_file) = video_file {
+      print!("video file");
       // Create a video track
       let video_track = Arc::new(TrackLocalStaticSample::new(
         RTCRtpCodecCapability {
@@ -219,6 +233,7 @@ impl WebRtcClass {
       });
 
       let video_file_name = video_file.to_owned();
+      let notify_video2 = Arc::clone(&notify_video);
       tokio::spawn(async move {
         // Open a H264 file and start reading using our H264Reader
         let file = File::open(&video_file_name)?;
@@ -227,7 +242,7 @@ impl WebRtcClass {
         let mut h264 = H264Reader::new(reader, buffersize);
 
         // Wait for connection established
-        let _ = notify_video.notified().await;
+        let _ = notify_video2.clone().notified().await;
 
         println!("play video from disk file {}", video_file_name);
 
@@ -269,6 +284,8 @@ impl WebRtcClass {
 
         Result::<()>::Ok(())
       });
+    } else {
+      print!("No video file");
     }
 
     // set remote description
@@ -288,11 +305,22 @@ impl WebRtcClass {
         Box::pin(async {})
       }));
 
+    self
+      .peer_connection
+      .on_ice_connection_state_change(Box::new(move |connection_state: RTCIceConnectionState| {
+        println!("Connection State has changed {}", connection_state);
+        if connection_state == RTCIceConnectionState::Connected {
+          notify_video.notify_waiters();
+        }
+        Box::pin(async {})
+      }));
     let send_callback = self.send_callback.clone();
     let pc = Arc::downgrade(&self.peer_connection);
     self
       .peer_connection
       .on_negotiation_needed(Box::new(move || {
+        println!("Rust: Negotiation needed");
+
         let send_callback = send_callback.clone();
         let pc2 = pc.clone();
         Box::pin(async move {
@@ -301,7 +329,11 @@ impl WebRtcClass {
 
             pc.set_local_description(offer.clone()).await.unwrap();
             let local_description = pc.local_description().await.unwrap();
-            let offer = serde_json::to_string(&local_description).unwrap();
+            let wrapped = DecsWrapper {
+              description: local_description,
+            };
+            let offer = serde_json::to_string(&wrapped).unwrap();
+            println!("Rust: on_negotiation_needed {:?}", offer);
             let _ = send_callback
               .unwrap()
               .call(Ok(offer), ThreadsafeFunctionCallMode::Blocking);
@@ -318,6 +350,7 @@ impl WebRtcClass {
     self
       .peer_connection
       .on_ice_candidate(Box::new(move |c: Option<RTCIceCandidate>| {
+        println!("Rust: on_ice_candidate {:?}", c);
         //println!("on_ice_candidate {:?}", c);
 
         //let pc2 = pc.clone();
@@ -326,10 +359,14 @@ impl WebRtcClass {
         //let addr3 = addr2.clone();
         Box::pin(async move {
           if let Some(c) = c {
-            let c = serde_json::to_string(&c).unwrap();
+            let wrapped = IceWrapper {
+              candidate: c.to_json().unwrap(),
+            };
+            let c = serde_json::to_string(&wrapped).unwrap();
+            println!("Rust: on_ice_candidate {:?}", c);
             send_callback2
               .unwrap()
-              .call(Ok(c), ThreadsafeFunctionCallMode::NonBlocking);
+              .call(Ok(c), ThreadsafeFunctionCallMode::Blocking);
 
             //if let Some(pc) = pc2.upgrade() {
 
@@ -355,40 +392,51 @@ impl WebRtcClass {
       let answer = peer_connection.create_answer(None).await.unwrap();
       peer_connection.set_local_description(answer).await.unwrap();
       let local_description = peer_connection.local_description().await.unwrap();
-      let answer = serde_json::to_string(&local_description).unwrap();
+      let wrapped = DecsWrapper {
+        description: local_description,
+      };
+      let answer = serde_json::to_string(&wrapped).unwrap();
       send_callback.call(Ok(answer), ThreadsafeFunctionCallMode::NonBlocking);
     }
   }
-  async fn add_ice_candidate(peer_connection: Arc<RTCPeerConnection>, candidate: String) {
-    let c: RTCIceCandidateInit = serde_json::from_str(&candidate).unwrap();
-    peer_connection.add_ice_candidate(c).await.unwrap();
+  async fn add_ice_candidate(
+    peer_connection: Arc<RTCPeerConnection>,
+    candidate: RTCIceCandidateInit,
+  ) {
+    //let c: RTCIceCandidateInit = serde_json::from_str(&candidate).unwrap();
+    peer_connection.add_ice_candidate(candidate).await.unwrap();
   }
   #[napi]
   pub fn send_message(&self, message: String) {
+    println!("Rust: send_message {:?}", message);
     let peer_connection = self.peer_connection.clone();
     let send_callback = self.send_callback.clone();
     tokio::spawn(async move {
-      if let Ok(description) = serde_json::from_str::<RTCSessionDescription>(&message) {
-        Self::on_description(peer_connection, send_callback.unwrap(), description).await;
-      } else {
-        Self::add_ice_candidate(peer_connection, message).await;
+      if let Ok(description) = serde_json::from_str::<DecsWrapper>(&message) {
+        Self::on_description(
+          peer_connection,
+          send_callback.unwrap(),
+          description.description,
+        )
+        .await;
+      } else if let Ok(message) = serde_json::from_str::<IceWrapper>(&message) {
+        Self::add_ice_candidate(peer_connection, message.candidate).await;
       }
     });
   }
 
-  #[napi]
-  pub  fn on_message(&mut self, callback: JsFunction) {
-
-      let tsfn = callback
-        .create_threadsafe_function(0, |ctx: ThreadSafeCallContext<String>| {
-          ctx
-            .env
-            .create_string(&ctx.value)
-            .map(|js_value| vec![js_value])
-        })
-        .unwrap();
-      self.send_callback = Some(tsfn);
-      //self.init().await;
+  #[napi(ts_args_type = "callback: (err:null|Error, result: string) => void")]
+  pub fn on_message(&mut self, callback: JsFunction) {
+    let tsfn: ThreadsafeFunction<String, ErrorStrategy::CalleeHandled> = callback
+      .create_threadsafe_function(0, |ctx: ThreadSafeCallContext<String>| {
+        ctx
+          .env
+          .create_string(&ctx.value)
+          .map(|js_value| vec![js_value])
+      })
+      .unwrap();
+    self.send_callback = Some(tsfn);
+    //self.init().await;
   }
   #[napi]
   pub async fn start(&self) {
