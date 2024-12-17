@@ -8,6 +8,28 @@ import { Button, mouse, keyboard, KeyboardClass, Key } from "@nut-tree-fork/nut-
 import { k } from 'vite/dist/node/types.d-aGj9QkWt'
 import { on } from 'events'
 import { sendLeftClickAt, sendRightClickAt, sendMiddleClickAt, sendMouseMoveAt } from "@pablodegroot/virtual_input"
+import { WebRTC } from "@webrtc_rust_client"
+
+
+WebRTC.create({
+  iceServers: [
+    {
+      urls: ["stun:stun.cloudflare.com:3478",
+        "turn:turn.cloudflare.com:3478?transport=udp",
+        "turn:turn.cloudflare.com:3478?transport=tcp",
+        "turns:turn.cloudflare.com:5349?transport=tcp"],
+      username: "REDACTED_TURN_USERNAME",
+      credential: "REDACTED_TURN_CREDENTIAL"
+
+    }
+  ]
+}).then((webrtc) => {
+
+  webrtc.onMessage((data) => {
+    console.log("onMessage", data);
+  });
+});
+
 const path = require('path')
 let mainWindow: BrowserWindow | null = null
 let onMainWindow: ((mainWindow: BrowserWindow) => void) | null = null;
