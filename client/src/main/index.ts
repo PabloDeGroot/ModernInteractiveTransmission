@@ -31,7 +31,7 @@ callChannel.onConnection = (callRef, awnsRef) => {
   }).then((webrtc) => {
     webrtc.onMessage((err, data) => {
       let message = JSON.parse(data);
-      console.log("onMessage", message);
+      //console.log("onMessage", message);
       signaling.send(message);
     });
     webrtc.start();

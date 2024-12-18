@@ -3,7 +3,7 @@
 use std::{
   fs::File,
   future::Future,
-  io::BufReader,
+  io::{BufReader, Read},
   rc::{Rc, Weak},
   string,
   sync::{Arc, Mutex},
@@ -42,6 +42,10 @@ use webrtc::{
     signaling_state::{self, RTCSignalingState},
     RTCPeerConnection,
   },
+  rtp::codecs::{
+    h264::{self, H264Payloader},
+    h265::H265Packet,
+  },
   rtp_transceiver::rtp_codec::RTCRtpCodecCapability,
   sdp::description,
   track::track_local::{track_local_static_sample::TrackLocalStaticSample, TrackLocal},
@@ -49,8 +53,8 @@ use webrtc::{
 use windows::{
   Foundation::{IMemoryBuffer, MemoryBuffer},
   Storage::Streams::{
-    Buffer, DataReader, DataWriter, IBuffer, IRandomAccessStream, InMemoryRandomAccessStream,
-    RandomAccessStream, RandomAccessStreamOverStream,
+    Buffer, DataReader, DataWriter, IBuffer, IInputStream, IRandomAccessStream,
+    InMemoryRandomAccessStream, RandomAccessStream, RandomAccessStreamOverStream,
   },
 };
 use windows_capture::{
@@ -63,7 +67,7 @@ use windows_capture::{
 extern crate napi_derive;
 
 struct CaptureSettings {
-  pub stream: Arc<IRandomAccessStream>,
+  pub stream: IRandomAccessStream,
 }
 unsafe impl Send for CaptureSettings {}
 
@@ -83,12 +87,15 @@ impl GraphicsCaptureApiHandler for Capture {
   ) -> std::result::Result<Self, Self::Error> {
     //let input_stream = InMemoryRandomAccessStream::new().unwrap();
     //let random = input_stream.CloneStream().unwrap();
-
+    let monitor = Monitor::primary().unwrap();
+    let mut video_settings: VideoSettingsBuilder =
+      VideoSettingsBuilder::new(monitor.width().unwrap(), monitor.height().unwrap());
+    video_settings = video_settings.sub_type(windows_capture::encoder::VideoSettingsSubType::H264);
     let encoder = VideoEncoder::new_from_stream(
-      VideoSettingsBuilder::new(1920, 1080),
+      video_settings,
       AudioSettingsBuilder::default().disabled(true),
       ContainerSettingsBuilder::default(),
-      Arc::into_inner(ctx.flags.stream).unwrap(),
+      ctx.flags.stream,
     );
 
     Ok(Capture {
@@ -196,10 +203,46 @@ pub struct WebRtcClass {
 
   //signaling: Arc<Signaling>,
 }
+struct StreamWrapper {
+  stream: IRandomAccessStream,
+}
+unsafe impl Send for StreamWrapper {}
+impl Read for StreamWrapper {
+  fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    //let options = self.stream.InputStreamOptions().unwrap();
+    if buf.len() == 0 {
+      return Ok(0);
+    }
+    //println!("Options {:?}", options);
+    let buffer = Buffer::Create(buf.len() as u32).unwrap();
+    let a: windows::Foundation::IAsyncOperationWithProgress<IBuffer, u32> = self
+      .stream
+      .ReadAsync(
+        &buffer,
+        buf.len() as u32,
+        windows::Storage::Streams::InputStreamOptions(0),
+      )
+      .unwrap();
+    loop {
+      if a.Status().unwrap() == windows::Foundation::AsyncStatus::Completed {
+        break;
+      }
+    }
+    let res = DataReader::FromBuffer(&buffer)
+      .unwrap()
+      .ReadBytes(buf);
+    if let Err(err) = res {
+      println!("Error {:?}", err);
+      return Err(err.into());
+    }
+    res.unwrap();
+    Ok(buf.len())
+  }
+}
 
 #[napi]
 impl WebRtcClass {
-  //#[napi(factory)]
+  #[napi(factory)]
   pub async fn create(conf: Configuration) -> napi::Result<Self> {
     let web = WebRtcClass {
       peer_connection: None,
@@ -210,60 +253,80 @@ impl WebRtcClass {
     Ok(web)
   }
   fn capture_screen(track: Arc<TrackLocalStaticSample>, notify: Arc<tokio::sync::Notify>) {
-    let stream = Arc::new(
-      InMemoryRandomAccessStream::new()
-        .unwrap()
-        .CloneStream()
-        .unwrap(),
-    );
+    let stream = InMemoryRandomAccessStream::new()
+      .unwrap()
+      .CloneStream()
+      .unwrap();
+    //let datareader = DataReader::CreateDataReader(&stream.GetInputStreamAt(0).unwrap()).unwrap();
+    let wrapped: StreamWrapper = StreamWrapper {
+      stream: stream.clone(),
+    };
+    {
+      let monitor = Monitor::primary().unwrap();
+      let capsettings = CaptureSettings { stream: stream };
+      let settings = Settings::new(
+        monitor,
+        CursorCaptureSettings::Default,
+        DrawBorderSettings::Default,
+        ColorFormat::Bgra8,
+        capsettings,
+      );
 
-    let capsettings = CaptureSettings { stream: stream };
-    let weak = Arc::downgrade(&stream);
-    let monitor = Monitor::primary().unwrap();
+      Capture::start_free_threaded(settings).unwrap();
+    };
 
-    let settings = Settings::new(
-      monitor,
-      CursorCaptureSettings::Default,
-      DrawBorderSettings::Default,
-      ColorFormat::Bgra8,
-      capsettings,
-    );
-
-    Capture::start_free_threaded(settings).unwrap();
-    
-    let upgr = weak.upgrade().unwrap();
-
-    let datareader  = DataReader::CreateDataReader(upgr.as_ref().GetInputStreamAt(0).unwrap()).unwrap();
     //let datareader = DataReader::CreateDataReader(stream.as_ref()).unwrap();
-    
+
     //let notify_video2 = Arc::clone(&notify);
 
     tokio::spawn(async move {
       println!("Waiting for connection");
       notify.notified().await;
       println!("Connected");
+      //let buf = datareader.LoadAsync(1024).unwrap();
+
+      let mut h264 = H264Reader::new(wrapped, 1024);
 
       let mut ticker = tokio::time::interval(Duration::from_millis(33));
       loop {
+        let nal = match h264.next_nal() {
+          Ok(nal) => nal,
+          Err(err) => {
+            println!("All video frames parsed and sent: {}", err);
+            break;
+          }
+        };
+        track
+          .write_sample(&Sample {
+            data: nal.data.freeze(),
+            duration: Duration::from_secs(1),
+            ..Default::default()
+          })
+          .await
+          .unwrap();
+
+        ticker.tick().await;
+
+        /*
         let bytes_size = datareader.UnconsumedBufferLength().unwrap();
         if bytes_size == 0 {
           continue;
         }
-        println!("Bytes size: {:?}", bytes_size);
         let mut bytes_vec: Vec<u8> = vec![0; bytes_size as usize];
+
         let chunks: Vec<&mut [u8]> = bytes_vec.chunks_mut(1024).collect();
         for chunk in chunks {
           datareader.ReadBytes(chunk).unwrap();
           let chunk = chunk.to_vec();
-
+          //println!("Read chunk {:?}", chunk);
           let sample = Sample {
             data: chunk.into(),
-            duration: Duration::from_secs(1),
+            duration: Duration::from_millis(33),
             ..Default::default()
           };
           track.write_sample(&sample).await.unwrap();
-          let _ = ticker.tick().await;
-        }
+          ticker.tick().await;
+        } */
       }
     });
   }
@@ -333,7 +396,7 @@ impl WebRtcClass {
                 description: local_description,
               };
               let offer = serde_json::to_string(&wrapped).unwrap();
-              println!("Rust: on_negotiation_needed {:?}", offer);
+              //println!("Rust: on_negotiation_needed {:?}", offer);
               let _ = send_callback
                 .unwrap()
                 .call(Ok(offer), ThreadsafeFunctionCallMode::Blocking);
@@ -409,7 +472,7 @@ impl WebRtcClass {
     //let pc = Arc::downgrade(&peer_connection);
     let send_callback = self.send_callback.clone();
     peer_connection.on_ice_candidate(Box::new(move |c: Option<RTCIceCandidate>| {
-      println!("Rust: on_ice_candidate {:?}", c);
+      //println!("Rust: on_ice_candidate {:?}", c);
       //println!("on_ice_candidate {:?}", c);
 
       //let pc2 = pc.clone();
@@ -422,7 +485,7 @@ impl WebRtcClass {
             candidate: c.to_json().unwrap(),
           };
           let c = serde_json::to_string(&wrapped).unwrap();
-          println!("Rust: on_ice_candidate {:?}", c);
+          //println!("Rust: on_ice_candidate {:?}", c);
           send_callback2
             .unwrap()
             .call(Ok(c), ThreadsafeFunctionCallMode::Blocking);
@@ -441,7 +504,7 @@ impl WebRtcClass {
     send_callback: ThreadsafeFunction<String>,
     description: RTCSessionDescription,
   ) {
-    println!("{:?}", description);
+    //println!("{:?}", description);
     let desc_type = description.sdp_type;
     peer_connection
       .set_remote_description(description)
@@ -467,7 +530,7 @@ impl WebRtcClass {
   }
   #[napi]
   pub fn send_message(&self, message: String) {
-    println!("Rust: send_message {:?}", message);
+    //println!("Rust: send_message {:?}", message);
     let peer_connection = self.peer_connection.as_ref().unwrap().clone();
     let send_callback = self.send_callback.clone();
     tokio::spawn(async move {

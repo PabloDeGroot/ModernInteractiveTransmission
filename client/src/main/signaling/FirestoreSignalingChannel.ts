@@ -21,7 +21,7 @@ class FirestoreSignalingChannel {
         this.data = {data: []};
         onSnapshot(this.readRef, (doc) => {
             if (!doc.data()?.data) return;
-            console.log("Signaler: Emitting onmessage", doc.data());
+            //console.log("Signaler: Emitting onmessage", doc.data());
             // get new data
             let alldata = doc.data()!.data as string[];
             // get old data
@@ -37,7 +37,7 @@ class FirestoreSignalingChannel {
     }
 
     send(data: any): void {
-        console.log("sending", data);
+        //console.log("sending", data);
 
         setDoc(this.sendRef, {data: arrayUnion(JSON.stringify(data))}, {merge: true});
     }
