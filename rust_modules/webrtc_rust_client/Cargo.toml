@@ -15,6 +15,7 @@ serde = "1.0.216"
 serde_json = "1.0.133"
 tokio = "1.42.0"
 webrtc = "0.12.0"
+windows = { version = "0.58.0", features = ["Storage_Streams"] }
 windows-capture = "1.4.2"
 
 [build-dependencies]
@@ -23,3 +24,6 @@ napi-build = "2.0.1"
 [profile.release]
 lto = true
 strip = "symbols"
+
+[profile.dev]
+opt-level = 1

@@ -4,9 +4,10 @@ use std::{
   fs::File,
   future::Future,
   io::BufReader,
+  rc::{Rc, Weak},
   string,
   sync::{Arc, Mutex},
-  time::Duration,
+  time::{Duration, Instant},
 };
 
 use napi::{
@@ -27,11 +28,14 @@ use webrtc::{
   },
   dtls::Error,
   ice_transport::{
-    ice_candidate::{RTCIceCandidate, RTCIceCandidateInit}, ice_connection_state::RTCIceConnectionState, ice_server::RTCIceServer
+    ice_candidate::{RTCIceCandidate, RTCIceCandidateInit},
+    ice_connection_state::RTCIceConnectionState,
+    ice_server::RTCIceServer,
   },
   interceptor::registry::Registry,
   media::{io::h264_reader::H264Reader, Sample},
   peer_connection::{
+    self,
     configuration::RTCConfiguration,
     peer_connection_state::RTCPeerConnectionState,
     sdp::{sdp_type::RTCSdpType, session_description::RTCSessionDescription},
@@ -42,24 +46,70 @@ use webrtc::{
   sdp::description,
   track::track_local::{track_local_static_sample::TrackLocalStaticSample, TrackLocal},
 };
+use windows::{
+  Foundation::{IMemoryBuffer, MemoryBuffer},
+  Storage::Streams::{
+    Buffer, DataReader, DataWriter, IBuffer, IRandomAccessStream, InMemoryRandomAccessStream,
+    RandomAccessStream, RandomAccessStreamOverStream,
+  },
+};
+use windows_capture::{
+  capture::GraphicsCaptureApiHandler,
+  encoder::{AudioSettingsBuilder, ContainerSettingsBuilder, VideoEncoder, VideoSettingsBuilder},
+  monitor::Monitor,
+  settings::{ColorFormat, CursorCaptureSettings, DrawBorderSettings, Settings},
+};
 #[macro_use]
 extern crate napi_derive;
 
-// webrtc class
-// pass config in constructor
-// pass signaling send callback
-// pass signaling receive function
+struct CaptureSettings {
+  pub stream: Arc<IRandomAccessStream>,
+}
+unsafe impl Send for CaptureSettings {}
 
-// signaling
-// send_signal(callback)
-// on_signal(message)
+struct Capture {
+  // The video encoder that will be used to encode the frames.
+  encoder: Option<VideoEncoder>,
+  start: Instant,
+  //stream: IRandomAccessStream,
+}
+impl GraphicsCaptureApiHandler for Capture {
+  type Flags = CaptureSettings;
 
-// has onConnection that returns a connection object
+  type Error = Box<dyn std::error::Error + Send + Sync>;
 
-// connection class
-// has onMessage that returns a Json
-// has onTrack that returns a track object
-// has onClose that returns void
+  fn new(
+    ctx: windows_capture::capture::Context<Self::Flags>,
+  ) -> std::result::Result<Self, Self::Error> {
+    //let input_stream = InMemoryRandomAccessStream::new().unwrap();
+    //let random = input_stream.CloneStream().unwrap();
+
+    let encoder = VideoEncoder::new_from_stream(
+      VideoSettingsBuilder::new(1920, 1080),
+      AudioSettingsBuilder::default().disabled(true),
+      ContainerSettingsBuilder::default(),
+      Arc::into_inner(ctx.flags.stream).unwrap(),
+    );
+
+    Ok(Capture {
+      encoder: Some(encoder.unwrap()),
+      start: Instant::now(),
+      //stream: random,
+    })
+  }
+
+  fn on_frame_arrived(
+    &mut self,
+    frame: &mut windows_capture::frame::Frame,
+    _capture_control: windows_capture::graphics_capture_api::InternalCaptureControl,
+  ) -> std::result::Result<(), Self::Error> {
+    self.start = Instant::now();
+    let encoder = self.encoder.as_mut().unwrap();
+
+    encoder.send_frame(frame).unwrap();
+    Ok(())
+  }
+}
 
 #[derive(Serialize, serde::Deserialize)]
 pub struct DecsWrapper {
@@ -139,8 +189,9 @@ fn send_message(ctx: CallContext) -> napi::Result<JsUndefined> {
 
 #[napi(js_name = "WebRTC")]
 pub struct WebRtcClass {
-  peer_connection: Arc<RTCPeerConnection>,
+  peer_connection: Option<Arc<RTCPeerConnection>>,
   send_callback: Option<ThreadsafeFunction<String>>,
+  config: Configuration,
   //connection_callback: Option<ThreadsafeFunction<ConnectionClass>>,
 
   //signaling: Arc<Signaling>,
@@ -148,8 +199,76 @@ pub struct WebRtcClass {
 
 #[napi]
 impl WebRtcClass {
-  #[napi(factory)]
+  //#[napi(factory)]
   pub async fn create(conf: Configuration) -> napi::Result<Self> {
+    let web = WebRtcClass {
+      peer_connection: None,
+      send_callback: None,
+      config: conf,
+    };
+
+    Ok(web)
+  }
+  fn capture_screen(track: Arc<TrackLocalStaticSample>, notify: Arc<tokio::sync::Notify>) {
+    let stream = Arc::new(
+      InMemoryRandomAccessStream::new()
+        .unwrap()
+        .CloneStream()
+        .unwrap(),
+    );
+
+    let capsettings = CaptureSettings { stream: stream };
+    let weak = Arc::downgrade(&stream);
+    let monitor = Monitor::primary().unwrap();
+
+    let settings = Settings::new(
+      monitor,
+      CursorCaptureSettings::Default,
+      DrawBorderSettings::Default,
+      ColorFormat::Bgra8,
+      capsettings,
+    );
+
+    Capture::start_free_threaded(settings).unwrap();
+    
+    let upgr = weak.upgrade().unwrap();
+
+    let datareader  = DataReader::CreateDataReader(upgr.as_ref().GetInputStreamAt(0).unwrap()).unwrap();
+    //let datareader = DataReader::CreateDataReader(stream.as_ref()).unwrap();
+    
+    //let notify_video2 = Arc::clone(&notify);
+
+    tokio::spawn(async move {
+      println!("Waiting for connection");
+      notify.notified().await;
+      println!("Connected");
+
+      let mut ticker = tokio::time::interval(Duration::from_millis(33));
+      loop {
+        let bytes_size = datareader.UnconsumedBufferLength().unwrap();
+        if bytes_size == 0 {
+          continue;
+        }
+        println!("Bytes size: {:?}", bytes_size);
+        let mut bytes_vec: Vec<u8> = vec![0; bytes_size as usize];
+        let chunks: Vec<&mut [u8]> = bytes_vec.chunks_mut(1024).collect();
+        for chunk in chunks {
+          datareader.ReadBytes(chunk).unwrap();
+          let chunk = chunk.to_vec();
+
+          let sample = Sample {
+            data: chunk.into(),
+            duration: Duration::from_secs(1),
+            ..Default::default()
+          };
+          track.write_sample(&sample).await.unwrap();
+          let _ = ticker.tick().await;
+        }
+      }
+    });
+  }
+
+  pub async fn init(&mut self) {
     //let conf = ctx.get::<Configuration>(0)?;
 
     let mut m = MediaEngine::default();
@@ -172,7 +291,8 @@ impl WebRtcClass {
     let mut rtc_config = RTCConfiguration {
       ..Default::default()
     };
-    rtc_config.ice_servers = conf
+    rtc_config.ice_servers = self
+      .config
       .ice_servers
       .iter()
       .map(|x| RTCIceServer {
@@ -185,121 +305,82 @@ impl WebRtcClass {
 
     // Create a new RTCPeerConnection
     let peer_connection = Arc::new(api.new_peer_connection(rtc_config).await.unwrap());
+    self.peer_connection = Some(peer_connection);
 
-    let web = WebRtcClass {
-      peer_connection,
-      send_callback: None,
-    };
-
-    Ok(web)
-  }
-  pub async fn init(&self) {
     println!("Rust: init");
     // await offer from signaling server
     // let offer = await signaling.receive();
 
-    let video_file = Some("C:/Users/pablo/Downloads/output.h264");
-    let notify_video = Arc::new(tokio::sync::Notify::new());
+    let send_callback = self.send_callback.clone();
+    let pc = Arc::downgrade(&self.peer_connection.as_ref().unwrap());
+    self
+      .peer_connection
+      .as_ref()
+      .unwrap()
+      .on_negotiation_needed(Box::new(move || {
+        println!("Rust: Negotiation needed");
 
-    let (done_tx, mut done_rx) = tokio::sync::mpsc::channel::<()>(1);
+        Box::pin({
+          let send_callback = send_callback.clone();
+          let pc = pc.clone();
+          async move {
+            if let Some(pc) = pc.upgrade() {
+              let offer = pc.create_offer(None).await.unwrap();
 
-    // add tracks
-    if let Some(video_file) = video_file {
-      print!("video file");
-      // Create a video track
-      let video_track = Arc::new(TrackLocalStaticSample::new(
-        RTCRtpCodecCapability {
-          mime_type: MIME_TYPE_H264.to_owned(),
-          ..Default::default()
-        },
-        "video".to_owned(),
-        "webrtc-rs".to_owned(),
-      ));
-
-      // Add this newly created track to the PeerConnection
-      let rtp_sender = self
-        .peer_connection
-        .add_track(Arc::clone(&video_track) as Arc<dyn TrackLocal + Send + Sync>)
-        .await
-        .unwrap();
-
-      // Read incoming RTCP packets
-      // Before these packets are returned they are processed by interceptors. For things
-      // like NACK this needs to be called.
-      tokio::spawn(async move {
-        let mut rtcp_buf = vec![0u8; 1500];
-        while let Ok((_, _)) = rtp_sender.read(&mut rtcp_buf).await {}
-        Result::<()>::Ok(())
-      });
-
-      let video_file_name = video_file.to_owned();
-      let notify_video2 = Arc::clone(&notify_video);
-      tokio::spawn(async move {
-        // Open a H264 file and start reading using our H264Reader
-        let file = File::open(&video_file_name)?;
-        let reader = BufReader::new(file);
-        let buffersize = 2048;
-        let mut h264 = H264Reader::new(reader, buffersize);
-
-        // Wait for connection established
-        let _ = notify_video2.clone().notified().await;
-
-        println!("play video from disk file {}", video_file_name);
-
-        // It is important to use a time.Ticker instead of time.Sleep because
-        // * avoids accumulating skew, just calling time.Sleep didn't compensate for the time spent parsing the data
-        // * works around latency issues with Sleep
-        let mut ticker = tokio::time::interval(Duration::from_millis(33));
-        loop {
-          let nal = match h264.next_nal() {
-            Ok(nal) => nal,
-            Err(err) => {
-              println!("All video frames parsed and sent: {}", err);
-              break;
+              pc.set_local_description(offer.clone()).await.unwrap();
+              let local_description = pc.local_description().await.unwrap();
+              let wrapped = DecsWrapper {
+                description: local_description,
+              };
+              let offer = serde_json::to_string(&wrapped).unwrap();
+              println!("Rust: on_negotiation_needed {:?}", offer);
+              let _ = send_callback
+                .unwrap()
+                .call(Ok(offer), ThreadsafeFunctionCallMode::Blocking);
             }
-          };
+          }
+        })
+      }));
 
-          /*println!(
-              "PictureOrderCount={}, ForbiddenZeroBit={}, RefIdc={}, UnitType={}, data={}",
-              nal.picture_order_count,
-              nal.forbidden_zero_bit,
-              nal.ref_idc,
-              nal.unit_type,
-              nal.data.len()
-          );*/
+    // add video track
+    let video_track = Arc::new(TrackLocalStaticSample::new(
+      RTCRtpCodecCapability {
+        mime_type: MIME_TYPE_H264.to_owned(),
+        ..Default::default()
+      },
+      "video".to_owned(),
+      "webrtc-rs".to_owned(),
+    ));
 
-          video_track
-            .write_sample(&Sample {
-              data: nal.data.freeze(),
-              duration: Duration::from_secs(1),
-              ..Default::default()
-            })
-            .await
-            .unwrap();
+    let rtp_sender = self
+      .peer_connection
+      .as_ref()
+      .unwrap()
+      .add_track(Arc::clone(&video_track) as Arc<dyn TrackLocal + Send + Sync>)
+      .await
+      .unwrap();
 
-          let _ = ticker.tick().await;
-        }
+    // Read incoming RTCP packets
+    // Before these packets are returned they are processed by interceptors. For things
+    // like NACK this needs to be called.
+    tokio::spawn(async move {
+      let mut rtcp_buf = vec![0u8; 1500];
+      while let Ok((_, _)) = rtp_sender.read(&mut rtcp_buf).await {}
+      Result::<()>::Ok(())
+    });
 
-        let _ = done_tx.try_send(());
+    let notify_tx = Arc::new(tokio::sync::Notify::new());
+    let notify_video = notify_tx.clone();
+    //let notify_video2 = Arc::clone(&notify_video.clone());
+    //tokio::spawn(async move {
+    Self::capture_screen(video_track, notify_video);
 
-        Result::<()>::Ok(())
-      });
-    } else {
-      print!("No video file");
-    }
-
-    // set remote description
-    // await peer_connection.set_remote_description(offer);
-    // let answer = await peer_connection.create_answer(None);
-
-    // set local description
-    // await peer_connection.set_local_description(answer);
-
-    // send answer to signaling server
-    // await signaling.send(answer);
+    println!("Rust: init 2");
 
     self
       .peer_connection
+      .as_ref()
+      .unwrap()
       .on_peer_connection_state_change(Box::new(move |s: RTCPeerConnectionState| {
         println!("Peer Connection State has changed: {}", s);
         Box::pin(async {})
@@ -307,75 +388,53 @@ impl WebRtcClass {
 
     self
       .peer_connection
+      .as_ref()
+      .unwrap()
       .on_ice_connection_state_change(Box::new(move |connection_state: RTCIceConnectionState| {
         println!("Connection State has changed {}", connection_state);
         if connection_state == RTCIceConnectionState::Connected {
-          notify_video.notify_waiters();
+          notify_tx.notify_waiters();
         }
         Box::pin(async {})
       }));
-    let send_callback = self.send_callback.clone();
-    let pc = Arc::downgrade(&self.peer_connection);
-    self
-      .peer_connection
-      .on_negotiation_needed(Box::new(move || {
-        println!("Rust: Negotiation needed");
-
-        let send_callback = send_callback.clone();
-        let pc2 = pc.clone();
-        Box::pin(async move {
-          if let Some(pc) = pc2.upgrade() {
-            let offer = pc.create_offer(None).await.unwrap();
-
-            pc.set_local_description(offer.clone()).await.unwrap();
-            let local_description = pc.local_description().await.unwrap();
-            let wrapped = DecsWrapper {
-              description: local_description,
-            };
-            let offer = serde_json::to_string(&wrapped).unwrap();
-            println!("Rust: on_negotiation_needed {:?}", offer);
-            let _ = send_callback
-              .unwrap()
-              .call(Ok(offer), ThreadsafeFunctionCallMode::Blocking);
-          }
-        })
-      }));
 
     self.setup_ice_candidates().await;
+    println!("Rust: init 3");
+
+    //});
   }
 
   async fn setup_ice_candidates(&self) {
+    let peer_connection = self.peer_connection.as_ref().unwrap().clone();
     //let pc = Arc::downgrade(&peer_connection);
     let send_callback = self.send_callback.clone();
-    self
-      .peer_connection
-      .on_ice_candidate(Box::new(move |c: Option<RTCIceCandidate>| {
-        println!("Rust: on_ice_candidate {:?}", c);
-        //println!("on_ice_candidate {:?}", c);
+    peer_connection.on_ice_candidate(Box::new(move |c: Option<RTCIceCandidate>| {
+      println!("Rust: on_ice_candidate {:?}", c);
+      //println!("on_ice_candidate {:?}", c);
 
-        //let pc2 = pc.clone();
-        let send_callback2 = send_callback.clone();
-        //let pending_candidates3 = Arc::clone(&pending_candidates2);
-        //let addr3 = addr2.clone();
-        Box::pin(async move {
-          if let Some(c) = c {
-            let wrapped = IceWrapper {
-              candidate: c.to_json().unwrap(),
-            };
-            let c = serde_json::to_string(&wrapped).unwrap();
-            println!("Rust: on_ice_candidate {:?}", c);
-            send_callback2
-              .unwrap()
-              .call(Ok(c), ThreadsafeFunctionCallMode::Blocking);
+      //let pc2 = pc.clone();
+      let send_callback2 = send_callback.clone();
+      //let pending_candidates3 = Arc::clone(&pending_candidates2);
+      //let addr3 = addr2.clone();
+      Box::pin(async move {
+        if let Some(c) = c {
+          let wrapped = IceWrapper {
+            candidate: c.to_json().unwrap(),
+          };
+          let c = serde_json::to_string(&wrapped).unwrap();
+          println!("Rust: on_ice_candidate {:?}", c);
+          send_callback2
+            .unwrap()
+            .call(Ok(c), ThreadsafeFunctionCallMode::Blocking);
 
-            //if let Some(pc) = pc2.upgrade() {
+          //if let Some(pc) = pc2.upgrade() {
 
-            //let desc = pc.remote_description().await;
+          //let desc = pc.remote_description().await;
 
-            //}
-          }
-        })
-      }))
+          //}
+        }
+      })
+    }))
   }
   pub async fn on_description(
     peer_connection: Arc<RTCPeerConnection>,
@@ -409,7 +468,7 @@ impl WebRtcClass {
   #[napi]
   pub fn send_message(&self, message: String) {
     println!("Rust: send_message {:?}", message);
-    let peer_connection = self.peer_connection.clone();
+    let peer_connection = self.peer_connection.as_ref().unwrap().clone();
     let send_callback = self.send_callback.clone();
     tokio::spawn(async move {
       if let Ok(description) = serde_json::from_str::<DecsWrapper>(&message) {
@@ -439,7 +498,7 @@ impl WebRtcClass {
     //self.init().await;
   }
   #[napi]
-  pub async fn start(&self) {
+  pub async unsafe fn start(&mut self) {
     self.init().await;
   }
 } /*

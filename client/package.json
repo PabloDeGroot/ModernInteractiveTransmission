@@ -25,11 +25,11 @@
     "@electron-toolkit/utils": "^3.0.0",
     "@nut-tree-fork/nut-js": "^4.2.2",
     "@pablodegroot/virtual_input": "^0.0.12",
-    "@webrtc_rust_client": "^0.0.0",
     "firebase": "^11.0.2",
     "peerjs": "^1.5.4",
     "svelte": "^5.5.0",
-    "sveltefire": "^0.4.5"
+    "sveltefire": "^0.4.5",
+    "webrtc_rust_client": "file:../rust_modules/webrtc_rust_client"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^2.0.0",

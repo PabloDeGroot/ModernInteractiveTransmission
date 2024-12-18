@@ -7,7 +7,7 @@ import MenuBuilder from './menu'
 import { Button, mouse, keyboard, KeyboardClass, Key } from "@nut-tree-fork/nut-js"
 import { on } from 'events'
 import { sendLeftClickAt, sendRightClickAt, sendMiddleClickAt, sendMouseMoveAt } from "@pablodegroot/virtual_input"
-import { WebRTC } from "@webrtc_rust_client"
+import { WebRTC } from "webrtc_rust_client"
 import { FirestoreCallChannel } from './signaling/FirestoreCallChannel'
 import { FirestoreSignalingChannel } from './signaling/FirestoreSignalingChannel'
 
