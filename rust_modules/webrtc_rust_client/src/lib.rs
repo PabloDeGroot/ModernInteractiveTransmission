@@ -242,7 +242,7 @@ unsafe impl Send for WebRtcClass {}
 unsafe impl Sync for WebRtcClass {}
 #[napi]
 impl WebRtcClass {
-  #[napi(factory)]
+  //#[napi(factory)]
   pub async fn create(conf: Configuration) -> napi::Result<Self> {
     let web = WebRtcClass {
       peer_connection: None,
@@ -260,9 +260,14 @@ impl WebRtcClass {
       .fps(60, 1)
       .build(Colorspace::BGRA, width as _, height as _)
       .unwrap();
+    let mut res : Vec<u8> = Vec::new();
+    if i==0 {
+      res = enc.headers().unwrap().entirety().to_vec();
+    }
     let img = Image::bgra(width, height, frame.as_ref());
     let (data, _) = enc.encode((i * 60).into(), img).unwrap();
-    return data.entirety().to_vec();
+    res.extend(data.entirety().to_vec());
+    return res;
   }
   fn get_frame(&mut self) -> Option<Vec<u8>> {
     //let d = scrap::Display::primary().unwrap();
@@ -271,10 +276,11 @@ impl WebRtcClass {
     if let Some(c) = cap {
       let frame = c.frame();
       if frame.is_ok() {
+        //println!("Success");
         return Some(frame.unwrap().as_ref().to_vec());
       }
       if let Err(e) = frame {
-        println!("Error: {:?}", e);
+        //println!("Error: {:?}", e);
       }
     }
 
@@ -286,33 +292,35 @@ impl WebRtcClass {
     notify: Arc<tokio::sync::Notify>,
   ) {
     //let mut c = scrap::Capturer::new(scrap::Display::primary().unwrap()).unwrap();
-    let mut ticker = tokio::time::interval(Duration::from_secs(1));
+    let mut ticker = tokio::time::interval(Duration::from_secs(1) / 60);
     notify.notified().await;
+
+
+
     let mut count = 0;
 
     //count -= 1;
     loop {
-      count += 1;
-      ticker.tick().await;
-      let track = track.clone();
-
       let frame = self.get_frame();
       if (frame.is_none()) {
-        println!("No frame, {:?}", count);
+        ticker.tick().await;
+        //println!("No frame, {:?}", count);
         continue;
       }
-      println!("Frame, {:?}", count);
+      //println!("Frame, {:?}", count);
       let data = Self::encode_data(frame.unwrap(), count);
       //let notify2 = Arc::clone(&notify);
 
       track
         .write_sample(&Sample {
           data: data.into(),
-          duration: Duration::from_secs(1),
+          duration: Duration::from_secs(1)/60,
           ..Default::default()
         })
         .await
         .unwrap();
+
+      count += 1;
     }
   }
 
@@ -447,6 +455,7 @@ impl WebRtcClass {
 
     self.setup_ice_candidates().await;
     println!("Rust: init 3");
+
     Self::capture_screen(self, video_track, notify_video).await;
     //});
   }
