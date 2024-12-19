@@ -32,7 +32,7 @@
     //gradient.initGradient("#gradient-canvas");
     let canvas = $state<HTMLCanvasElement>();
     $effect(() => {
-        gradient.initGradient("#gradient-canvas");
+        //gradient.initGradient("#gradient-canvas");
     });
     let headerClass = $state("p-4");
     $effect(() => {

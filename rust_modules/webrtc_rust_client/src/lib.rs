@@ -1,9 +1,11 @@
 #![deny(clippy::all)]
 
 use std::{
+  borrow::Borrow,
   fs::File,
   future::Future,
   io::{BufReader, Read},
+  ops::Deref,
   rc::{Rc, Weak},
   string,
   sync::{Arc, Mutex},
@@ -19,6 +21,7 @@ use napi::{
   CallContext, Env, JsFunction, JsNumber, JsObject, JsString, JsUndefined, NapiValue, Property,
 };
 use notify::Result;
+use scrap::Frame;
 use serde::Serialize;
 use webrtc::{
   api::{
@@ -33,7 +36,10 @@ use webrtc::{
     ice_server::RTCIceServer,
   },
   interceptor::registry::Registry,
-  media::{io::h264_reader::H264Reader, Sample},
+  media::{
+    io::{h264_reader::H264Reader, ivf_reader::IVFReader},
+    Sample,
+  },
   peer_connection::{
     self,
     configuration::RTCConfiguration,
@@ -42,12 +48,15 @@ use webrtc::{
     signaling_state::{self, RTCSignalingState},
     RTCPeerConnection,
   },
-  rtp::codecs::{
-    h264::{self, H264Payloader},
-    h265::H265Packet,
+  rtp::{
+    codecs::{
+      h264::{self, H264Payloader},
+      h265::H265Packet,
+    },
+    packetizer::Payloader,
   },
   rtp_transceiver::rtp_codec::RTCRtpCodecCapability,
-  sdp::description,
+  sdp::{description, util::Codec},
   track::track_local::{track_local_static_sample::TrackLocalStaticSample, TrackLocal},
 };
 use windows::{
@@ -56,6 +65,7 @@ use windows::{
     Buffer, DataReader, DataWriter, IBuffer, IInputStream, IRandomAccessStream,
     InMemoryRandomAccessStream, RandomAccessStream, RandomAccessStreamOverStream,
   },
+  Win32::Devices::Display,
 };
 use windows_capture::{
   capture::GraphicsCaptureApiHandler,
@@ -63,6 +73,7 @@ use windows_capture::{
   monitor::Monitor,
   settings::{ColorFormat, CursorCaptureSettings, DrawBorderSettings, Settings},
 };
+use x264::{Colorspace, Image};
 #[macro_use]
 extern crate napi_derive;
 
@@ -90,7 +101,7 @@ impl GraphicsCaptureApiHandler for Capture {
     let monitor = Monitor::primary().unwrap();
     let mut video_settings: VideoSettingsBuilder =
       VideoSettingsBuilder::new(monitor.width().unwrap(), monitor.height().unwrap());
-    video_settings = video_settings.sub_type(windows_capture::encoder::VideoSettingsSubType::H264);
+    //video_settings = video_settings.sub_type(windows_capture::encoder::VideoSettingsSubType::H264);
     let encoder = VideoEncoder::new_from_stream(
       video_settings,
       AudioSettingsBuilder::default().disabled(true),
@@ -199,47 +210,36 @@ pub struct WebRtcClass {
   peer_connection: Option<Arc<RTCPeerConnection>>,
   send_callback: Option<ThreadsafeFunction<String>>,
   config: Configuration,
+  capturer: Arc<scrap::Capturer>,
   //connection_callback: Option<ThreadsafeFunction<ConnectionClass>>,
 
   //signaling: Arc<Signaling>,
 }
 struct StreamWrapper {
-  stream: IRandomAccessStream,
+  stream: IInputStream,
 }
 unsafe impl Send for StreamWrapper {}
 impl Read for StreamWrapper {
   fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-    //let options = self.stream.InputStreamOptions().unwrap();
-    if buf.len() == 0 {
-      return Ok(0);
-    }
-    //println!("Options {:?}", options);
-    let buffer = Buffer::Create(buf.len() as u32).unwrap();
-    let a: windows::Foundation::IAsyncOperationWithProgress<IBuffer, u32> = self
-      .stream
-      .ReadAsync(
-        &buffer,
-        buf.len() as u32,
-        windows::Storage::Streams::InputStreamOptions(0),
-      )
-      .unwrap();
+    let datareader = DataReader::CreateDataReader(&self.stream).unwrap();
+    let len = buf.len();
+    let load = datareader.LoadAsync(len as u32).unwrap();
     loop {
-      if a.Status().unwrap() == windows::Foundation::AsyncStatus::Completed {
+      let status = load.Status().unwrap();
+      if status == windows::Foundation::AsyncStatus::Completed {
         break;
       }
     }
-    let res = DataReader::FromBuffer(&buffer)
-      .unwrap()
-      .ReadBytes(buf);
-    if let Err(err) = res {
-      println!("Error {:?}", err);
-      return Err(err.into());
-    }
-    res.unwrap();
+    datareader.ReadBytes(buf).unwrap();
+    //display in hex
+    println!("{:x?}", buf);
+
+    //res.unwrap();
     Ok(buf.len())
   }
 }
-
+unsafe impl Send for WebRtcClass {}
+unsafe impl Sync for WebRtcClass {}
 #[napi]
 impl WebRtcClass {
   #[napi(factory)]
@@ -248,87 +248,72 @@ impl WebRtcClass {
       peer_connection: None,
       send_callback: None,
       config: conf,
+      capturer: Arc::new(scrap::Capturer::new(scrap::Display::primary().unwrap()).unwrap()),
     };
 
     Ok(web)
   }
-  fn capture_screen(track: Arc<TrackLocalStaticSample>, notify: Arc<tokio::sync::Notify>) {
-    let stream = InMemoryRandomAccessStream::new()
-      .unwrap()
-      .CloneStream()
+  fn encode_data(frame: Vec<u8>, i: u32) -> Vec<u8> {
+    let width = 1920;
+    let height = 1080;
+    let mut enc = x264::Encoder::builder()
+      .fps(60, 1)
+      .build(Colorspace::BGRA, width as _, height as _)
       .unwrap();
-    //let datareader = DataReader::CreateDataReader(&stream.GetInputStreamAt(0).unwrap()).unwrap();
-    let wrapped: StreamWrapper = StreamWrapper {
-      stream: stream.clone(),
-    };
-    {
-      let monitor = Monitor::primary().unwrap();
-      let capsettings = CaptureSettings { stream: stream };
-      let settings = Settings::new(
-        monitor,
-        CursorCaptureSettings::Default,
-        DrawBorderSettings::Default,
-        ColorFormat::Bgra8,
-        capsettings,
-      );
-
-      Capture::start_free_threaded(settings).unwrap();
-    };
-
-    //let datareader = DataReader::CreateDataReader(stream.as_ref()).unwrap();
-
-    //let notify_video2 = Arc::clone(&notify);
-
-    tokio::spawn(async move {
-      println!("Waiting for connection");
-      notify.notified().await;
-      println!("Connected");
-      //let buf = datareader.LoadAsync(1024).unwrap();
-
-      let mut h264 = H264Reader::new(wrapped, 1024);
-
-      let mut ticker = tokio::time::interval(Duration::from_millis(33));
-      loop {
-        let nal = match h264.next_nal() {
-          Ok(nal) => nal,
-          Err(err) => {
-            println!("All video frames parsed and sent: {}", err);
-            break;
-          }
-        };
-        track
-          .write_sample(&Sample {
-            data: nal.data.freeze(),
-            duration: Duration::from_secs(1),
-            ..Default::default()
-          })
-          .await
-          .unwrap();
-
-        ticker.tick().await;
-
-        /*
-        let bytes_size = datareader.UnconsumedBufferLength().unwrap();
-        if bytes_size == 0 {
-          continue;
-        }
-        let mut bytes_vec: Vec<u8> = vec![0; bytes_size as usize];
-
-        let chunks: Vec<&mut [u8]> = bytes_vec.chunks_mut(1024).collect();
-        for chunk in chunks {
-          datareader.ReadBytes(chunk).unwrap();
-          let chunk = chunk.to_vec();
-          //println!("Read chunk {:?}", chunk);
-          let sample = Sample {
-            data: chunk.into(),
-            duration: Duration::from_millis(33),
-            ..Default::default()
-          };
-          track.write_sample(&sample).await.unwrap();
-          ticker.tick().await;
-        } */
+    let img = Image::bgra(width, height, frame.as_ref());
+    let (data, _) = enc.encode((i * 60).into(), img).unwrap();
+    return data.entirety().to_vec();
+  }
+  fn get_frame(&mut self) -> Option<Vec<u8>> {
+    //let d = scrap::Display::primary().unwrap();
+    //let mut c = scrap::Capturer::new(d).unwrap();
+    let cap = Arc::get_mut(&mut self.capturer);
+    if let Some(c) = cap {
+      let frame = c.frame();
+      if frame.is_ok() {
+        return Some(frame.unwrap().as_ref().to_vec());
       }
-    });
+      if let Err(e) = frame {
+        println!("Error: {:?}", e);
+      }
+    }
+
+    return None;
+  }
+  async fn capture_screen(
+    &mut self,
+    track: Arc<TrackLocalStaticSample>,
+    notify: Arc<tokio::sync::Notify>,
+  ) {
+    //let mut c = scrap::Capturer::new(scrap::Display::primary().unwrap()).unwrap();
+    let mut ticker = tokio::time::interval(Duration::from_secs(1));
+    notify.notified().await;
+    let mut count = 0;
+
+    //count -= 1;
+    loop {
+      count += 1;
+      ticker.tick().await;
+      let track = track.clone();
+
+      let frame = self.get_frame();
+      if (frame.is_none()) {
+        println!("No frame, {:?}", count);
+        continue;
+      }
+      println!("Frame, {:?}", count);
+      let data = Self::encode_data(frame.unwrap(), count);
+      //let notify2 = Arc::clone(&notify);
+
+      track
+        .write_sample(&Sample {
+          data: data.into(),
+          duration: Duration::from_secs(1),
+          ..Default::default()
+        })
+        .await
+        .unwrap();
+    }
   }
 
   pub async fn init(&mut self) {
@@ -436,7 +421,6 @@ impl WebRtcClass {
     let notify_video = notify_tx.clone();
     //let notify_video2 = Arc::clone(&notify_video.clone());
     //tokio::spawn(async move {
-    Self::capture_screen(video_track, notify_video);
 
     println!("Rust: init 2");
 
@@ -463,7 +447,7 @@ impl WebRtcClass {
 
     self.setup_ice_candidates().await;
     println!("Rust: init 3");
-
+    Self::capture_screen(self, video_track, notify_video).await;
     //});
   }
 
