@@ -2,9 +2,9 @@
 
 use std::{
   borrow::Borrow,
-  fs::File,
+  fs::{self, File, OpenOptions},
   future::Future,
-  io::{BufReader, Read},
+  io::{BufReader, Read, Write,ErrorKind},
   ops::Deref,
   rc::{Rc, Weak},
   string,
@@ -20,7 +20,7 @@ use napi::{
   },
   CallContext, Env, JsFunction, JsNumber, JsObject, JsString, JsUndefined, NapiValue, Property,
 };
-use notify::Result;
+use notify::{ Result};
 use scrap::Frame;
 use serde::Serialize;
 use webrtc::{
@@ -37,7 +37,10 @@ use webrtc::{
   },
   interceptor::registry::Registry,
   media::{
-    io::{h264_reader::H264Reader, ivf_reader::IVFReader},
+    io::{
+      h264_reader::{self, H264Reader},
+      ivf_reader::IVFReader,
+    },
     Sample,
   },
   peer_connection::{
@@ -205,16 +208,111 @@ fn send_message(ctx: CallContext) -> napi::Result<JsUndefined> {
   ctx.env.get_undefined()
 }*/
 
+struct H264Capturer {
+  capturer: scrap::Capturer,
+  encoder : x264::Encoder,
+  width: usize,
+  height: usize,
+  count: u32,
+  //sent_header: bool,
+}
+impl H264Capturer {
+  pub fn new() -> Self {
+    let d = scrap::Display::primary().unwrap();
+    let width = d.width();
+    let height = d.height();
+    let c = scrap::Capturer::new(d).unwrap();
+    let enc = x264::Encoder::builder()
+      .fps(60, 1)
+      .build(Colorspace::BGRA, width as i32, height as i32)
+      .unwrap();
+    H264Capturer {
+      capturer: c,
+      count: 0,
+      width: width,
+      height: height,
+      encoder: enc,
+      //sent_header: false,
+    }
+  }
+  fn encode_data(&self, frame: Vec<u8>, i: u32) -> Vec<u8> {
+    let height = self.height as i32;
+    let width = self.width as i32;
+    let mut enc = x264::Encoder::builder()
+      .fps(60, 1)
+      .build(Colorspace::BGRA, width, height)
+      .unwrap();
+    let mut res: Vec<u8> = Vec::new();
+    if i == 0 {
+      res = enc.headers().unwrap().entirety().to_vec();
+    }
+    println!("Rust: encode_data frame {:?}", frame.len());
+    let img = Image::bgra(width, height, frame.as_ref());
+    let (data, _) = enc.encode((i * 60).into(), img).unwrap();
+    res.extend(data.entirety().to_vec());
+    println!("Rust: encode_data result {:?}", res.len());
+    return res;
+  }
+  fn get_frame(&mut self) -> Option<Vec<u8>> {
+    //let d = scrap::Display::primary().unwrap();
+    //let mut c = scrap::Capturer::new(d).unwrap();
+    let c = &mut self.capturer;
+
+    let frame = c.frame();
+    if frame.is_ok() {
+      //println!("Success");
+      return Some(frame.unwrap().as_ref().to_vec());
+    }
+    if let Err(e) = frame {
+      if e.kind() != ErrorKind::WouldBlock {
+        println!("Error: {:?}", e);
+      }
+    }
+
+    return None;
+  }
+}
+
+impl Read for H264Capturer {
+  fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    let frame = self.get_frame();
+    if frame.is_none() {
+      std::thread::sleep(Duration::from_millis(16));
+      return Ok(0);
+    }
+    let data = self.encode_data(frame.unwrap(), self.count);
+    self.count += 1;
+    //println!("Rust: read {:?}", self.count);
+    let len = buf.len();
+    let len2 = data.len();
+    if len2 < len {
+      buf[..len2].copy_from_slice(&data);
+      //self.count += 1;
+      return Ok(len2);
+    } else {
+      buf.copy_from_slice(&data[..len]);
+      //self.count += 1;
+      return Ok(len);
+    }
+
+    //return Ok(0);
+    //todo!()
+  }
+}
+unsafe impl Send for H264Capturer {}
+unsafe impl Sync for H264Capturer {}
+
 #[napi(js_name = "WebRTC")]
 pub struct WebRtcClass {
   peer_connection: Option<Arc<RTCPeerConnection>>,
   send_callback: Option<ThreadsafeFunction<String>>,
   config: Configuration,
-  capturer: Arc<scrap::Capturer>,
+  //capturer: Arc<scrap::Capturer>,
   //connection_callback: Option<ThreadsafeFunction<ConnectionClass>>,
 
   //signaling: Arc<Signaling>,
 }
+
 struct StreamWrapper {
   stream: IInputStream,
 }
@@ -238,90 +336,73 @@ impl Read for StreamWrapper {
     Ok(buf.len())
   }
 }
+
 unsafe impl Send for WebRtcClass {}
 unsafe impl Sync for WebRtcClass {}
 #[napi]
 impl WebRtcClass {
-  //#[napi(factory)]
+  #[napi(factory)]
   pub async fn create(conf: Configuration) -> napi::Result<Self> {
     let web = WebRtcClass {
       peer_connection: None,
       send_callback: None,
       config: conf,
-      capturer: Arc::new(scrap::Capturer::new(scrap::Display::primary().unwrap()).unwrap()),
+      //capturer: Arc::new(scrap::Capturer::new(scrap::Display::primary().unwrap()).unwrap()),
     };
 
     Ok(web)
   }
-  fn encode_data(frame: Vec<u8>, i: u32) -> Vec<u8> {
-    let width = 1920;
-    let height = 1080;
-    let mut enc = x264::Encoder::builder()
-      .fps(60, 1)
-      .build(Colorspace::BGRA, width as _, height as _)
-      .unwrap();
-    let mut res : Vec<u8> = Vec::new();
-    if i==0 {
-      res = enc.headers().unwrap().entirety().to_vec();
-    }
-    let img = Image::bgra(width, height, frame.as_ref());
-    let (data, _) = enc.encode((i * 60).into(), img).unwrap();
-    res.extend(data.entirety().to_vec());
-    return res;
-  }
-  fn get_frame(&mut self) -> Option<Vec<u8>> {
-    //let d = scrap::Display::primary().unwrap();
-    //let mut c = scrap::Capturer::new(d).unwrap();
-    let cap = Arc::get_mut(&mut self.capturer);
-    if let Some(c) = cap {
-      let frame = c.frame();
-      if frame.is_ok() {
-        //println!("Success");
-        return Some(frame.unwrap().as_ref().to_vec());
-      }
-      if let Err(e) = frame {
-        //println!("Error: {:?}", e);
-      }
-    }
 
-    return None;
-  }
   async fn capture_screen(
     &mut self,
     track: Arc<TrackLocalStaticSample>,
     notify: Arc<tokio::sync::Notify>,
   ) {
     //let mut c = scrap::Capturer::new(scrap::Display::primary().unwrap()).unwrap();
-    let mut ticker = tokio::time::interval(Duration::from_secs(1) / 60);
-    notify.notified().await;
+    //let mut ticker = tokio::time::interval(Duration::from_secs(1) / 60);
+    //notify.notified().await;
+    let mut cap = Arc::new(H264Capturer::new());
+    println!("Rust: capture_screen");
+    let mut file = OpenOptions::new()
+      .write(true)
+      .append(true)
+      .create(true)
+      .open("test.h264")
+      .unwrap();
+    println!("Rust: capture_screen file {:?}", file);
+    loop {
+      let buf = &mut [0u8; 4096];
+      //println!("Rust: capture_screen 2");
+      let modified = Arc::get_mut(&mut cap).unwrap().read(buf).unwrap();
+      if modified == 0 {
+        continue;
+      }
+      println!("Rust: capture_screen 2 {:?}", modified);
 
+      let buf2 = &mut buf[..modified];
+      //println!("Rust: capture_screen 3");
+      //append to file
+      file.write_all(buf2).unwrap();
+    }
+    /*let mut h264_reader = h264_reader::H264Reader::new(cap,4096);
 
-
-    let mut count = 0;
+    //let mut count = 0;
 
     //count -= 1;
     loop {
-      let frame = self.get_frame();
-      if (frame.is_none()) {
-        ticker.tick().await;
-        //println!("No frame, {:?}", count);
-        continue;
-      }
-      //println!("Frame, {:?}", count);
-      let data = Self::encode_data(frame.unwrap(), count);
-      //let notify2 = Arc::clone(&notify);
+     let nal = h264_reader.next_nal().unwrap();
 
       track
         .write_sample(&Sample {
-          data: data.into(),
-          duration: Duration::from_secs(1)/60,
+          data: nal.data.into(),
+          duration: Duration::from_secs(1) / 60,
           ..Default::default()
         })
         .await
         .unwrap();
 
-      count += 1;
-    }
+      //count += 1;
+    }*/
   }
 
   pub async fn init(&mut self) {
@@ -407,6 +488,9 @@ impl WebRtcClass {
       "video".to_owned(),
       "webrtc-rs".to_owned(),
     ));
+    let notify_tx = Arc::new(tokio::sync::Notify::new());
+    let notify_video = notify_tx.clone();
+    Self::capture_screen(self, video_track.clone(), notify_video).await;
 
     let rtp_sender = self
       .peer_connection
@@ -425,8 +509,6 @@ impl WebRtcClass {
       Result::<()>::Ok(())
     });
 
-    let notify_tx = Arc::new(tokio::sync::Notify::new());
-    let notify_video = notify_tx.clone();
     //let notify_video2 = Arc::clone(&notify_video.clone());
     //tokio::spawn(async move {
 
@@ -456,7 +538,6 @@ impl WebRtcClass {
     self.setup_ice_candidates().await;
     println!("Rust: init 3");
 
-    Self::capture_screen(self, video_track, notify_video).await;
     //});
   }
 
@@ -524,7 +605,11 @@ impl WebRtcClass {
   #[napi]
   pub fn send_message(&self, message: String) {
     //println!("Rust: send_message {:?}", message);
-    let peer_connection = self.peer_connection.as_ref().unwrap().clone();
+    let peer_connection_wrap = self.peer_connection.as_ref();
+    if peer_connection_wrap.is_none() {
+      return;
+    }
+    let peer_connection = peer_connection_wrap.unwrap().clone();
     let send_callback = self.send_callback.clone();
     tokio::spawn(async move {
       if let Ok(description) = serde_json::from_str::<DecsWrapper>(&message) {
