@@ -3,13 +3,17 @@
 use std::{
   alloc::System,
   borrow::Borrow,
+  cell::RefCell,
   fs::{self, File, OpenOptions},
   future::Future,
   io::{BufReader, ErrorKind, Read, Write},
   ops::Deref,
   rc::{Rc, Weak},
   string,
-  sync::{Arc, Mutex},
+  sync::{
+    mpsc::{Receiver, Sender},
+    Arc, Mutex,
+  },
   thread,
   time::{Duration, Instant, SystemTime},
 };
@@ -27,11 +31,15 @@ use openh264::{
   encoder::{EncodedBitStream, Encoder},
   formats::{BgraSliceU8, RgbSliceU8, RgbaSliceU8, YUVBuffer, YUVSource},
 };
+use rav1e::{
+  color::ColorDescription, config::SpeedSettings, prelude::v_frame::frame, Config, Context,
+  EncoderConfig, EncoderStatus,
+};
 use serde::Serialize;
 use webrtc::{
   api::{
     interceptor_registry::register_default_interceptors,
-    media_engine::{MediaEngine, MIME_TYPE_H264},
+    media_engine::{MediaEngine, MIME_TYPE_AV1, MIME_TYPE_H264},
     APIBuilder,
   },
   dtls::Error,
@@ -88,71 +96,159 @@ use yuvutils_rs::{
 extern crate napi_derive;
 
 struct CaptureSettings {
-  pub track: Arc<TrackLocalStaticSample>,
+  //pub track: Arc<TrackLocalStaticSample>,
   pub height: u32,
   pub width: u32,
-  // pub stream: IRandomAccessStream,
+  pub sender: Sender<Vec<u8>>,
 }
 unsafe impl Send for CaptureSettings {}
-
-struct Capture2 {
-  video_recorder: xcap::VideoRecorder,
-  track: Arc<TrackLocalStaticSample>,
-}
-impl Capture2 {
-  fn start(track: Arc<TrackLocalStaticSample>) {
-
-    let monitor = xcap::Monitor::from_point(100, 100).unwrap();
-
-    let video_recorder = Arc::new(monitor.video_recorder().unwrap());
-
-    let video_recorder_clone = video_recorder.clone();
-    let h265capturer = Arc::new(Mutex::new(H264Capturer::new(monitor.height() as usize, monitor.width() as usize)));
-    video_recorder.start().unwrap();
-
-    video_recorder_clone
-      .on_frame({
-        let h265capturer = Arc::clone(&h265capturer);
-         move |frame| {
-          let h265capturer = Arc::clone(&h265capturer);
-          let track = Arc::clone(&track);
-          let _ = Box::pin(async move {
-            let mut encoder = Encoder::new().unwrap();
-            let mut nals = Vec::new();
-            let mut h265capturer = h265capturer.lock().unwrap();
-            h265capturer.get_nals(&frame.raw, &mut nals, &mut encoder);
-            for nal in nals {
-              track
-                .write_sample(&Sample {
-                  data: nal.into(),
-                  ..Default::default()
-                })
-                .await
-                .unwrap();
-            }
-           
-          });
-          Ok(())
-        }
-      })
-      .unwrap();
-  }
-}
 
 struct Capture {
   // The video encoder that will be used to encode the frames.
   //encoder: Option<VideoEncoder>,
   start: Instant,
-  track: Arc<TrackLocalStaticSample>,
+  //track: Arc<TrackLocalStaticSample>,
   h265capturer: H264Capturer,
-  encoder: Encoder,
+  //frame: Arc<Vec<u8>>,
+  //context: Arc<Context<u8>>,
   frame_count: u32,
   // To count the number of frames captured since last reset
   frame_count_since_reset: u64,
   // To store the time when frame count was last reset
   last_reset: Instant,
   last_frame_time: i64,
+  update: Sender<Vec<u8>>,
   //stream: IRandomAccessStream,
+}
+struct Av1Encoder {
+  pub context: Context<u8>,
+  width: usize,
+  height: usize,
+  reciever: Receiver<Vec<u8>>,
+  track: Arc<TrackLocalStaticSample>,
+}
+impl Av1Encoder {
+  fn new(
+    track: Arc<TrackLocalStaticSample>,
+    reciever: Receiver<Vec<u8>>,
+    width: usize,
+    height: usize,
+  ) -> Self {
+    let encoder_config = EncoderConfig {
+      low_latency: true,
+      width: width,
+      height: height,
+      speed_settings: SpeedSettings::from_preset(10),
+
+      ..Default::default()
+    };
+    let cfg = Config::new().with_encoder_config(encoder_config);
+    let ctx: rav1e::Context<u8> = cfg.new_context().unwrap();
+    Av1Encoder {
+      context: ctx,
+      width: width,
+      height: height,
+      track: track,
+      reciever: reciever,
+    }
+  }
+  async fn start_encoding(&mut self) {
+    println!("Rust: start_encoding");
+
+    //send header
+
+    self
+      .track
+      .write_sample(&Sample {
+        data: self.context.container_sequence_header().into(),
+        ..Default::default()
+      })
+      .await
+      .unwrap();
+
+    loop {
+      let packet = self.context.receive_packet();
+      //println!("Rust: start_encoding {:?}", packet);
+      match packet {
+        Ok(packet) => {
+          self
+            .track
+            .write_sample(&Sample {
+              data: packet.data.into(),
+              ..Default::default()
+            })
+            .await
+            .unwrap();
+        }
+        Err(EncoderStatus::Encoded) => {
+          // A frame was encoded without emitting a packet. This is
+          // normal, just proceed as usual.
+        }
+        Err(EncoderStatus::LimitReached) => {
+          // All frames have been encoded. Time to break out of the
+          // loop.
+          break;
+        }
+        Err(EncoderStatus::NeedMoreData) => {
+          let data_res = self.reciever.try_recv();
+          if data_res.is_err() {
+            continue;
+          }
+          let data = data_res.unwrap();
+
+          println!("Rust: start_encoding {:?}", data.len());
+          if data.is_empty() {
+            continue;
+          }
+          let width = self.width;
+          let height = self.height;
+          let mut a_plane = Vec::with_capacity(width * height);
+          let mut y_plane = Vec::with_capacity(width * height);
+          let mut u_plane = Vec::with_capacity(width * height);
+          let mut v_plane = Vec::with_capacity(width * height);
+
+          for i in 0..height {
+            for j in 0..width {
+              let index = i * width + j;
+              let r = data[index * 4];
+              let g = data[index * 4 + 1];
+              let b = data[index * 4 + 2];
+              let a = data[index * 4 + 3];
+              y_plane.push((0.299 * r as f32 + 0.587 * g as f32 + 0.114 * b as f32) as u8);
+              u_plane.push((-0.169 * r as f32 - 0.331 * g as f32 + 0.5 * b as f32 + 128.0) as u8);
+              v_plane.push((0.5 * r as f32 - 0.419 * g as f32 - 0.081 * b as f32 + 128.0) as u8);
+              a_plane.push(a);
+            }
+          }
+          let planes = vec![y_plane, u_plane, v_plane, a_plane];
+
+          let mut frame = self.context.new_frame();
+
+          //let data2 = data[0..self.width * self.height * 3].to_vec();
+          for (plane, data) in frame.planes.iter_mut().zip(planes) {
+            plane.copy_from_raw_u8(&data, plane.cfg.width, 1);
+          }
+          self.context.send_frame(frame).unwrap();
+
+          //ctx.send_frame(frames.next().map(Arc::new))?;
+        }
+        Err(EncoderStatus::EnoughData) => {
+          // Since we aren't trying to push frames after flushing,
+          // this should never happen in this example.
+          unreachable!();
+        }
+        Err(EncoderStatus::NotReady) => {
+          // We're not doing two-pass encoding, so this can never
+          // occur.
+          unreachable!();
+        }
+        Err(EncoderStatus::Failure) => {
+          //println!("Rust: start_encoding {:?}", "Failure");
+          //return Err(EncoderStatus::Failure);
+        }
+      }
+    }
+  }
 }
 impl GraphicsCaptureApiHandler for Capture {
   type Flags = CaptureSettings;
@@ -164,11 +260,12 @@ impl GraphicsCaptureApiHandler for Capture {
   ) -> std::result::Result<Self, Self::Error> {
     let heigth = ctx.flags.height;
     let width = ctx.flags.width;
+    let update = ctx.flags.sender;
     //let input_stream = InMemoryRandomAccessStream::new().unwrap();
     //let random = input_stream.CloneStream().unwrap();
     //let monitor = Monitor::primary().unwrap();
-    let track = ctx.flags.track;
-    let video_settings = VideoSettingsBuilder::new(width, heigth);
+    //let track = ctx.flags.track;
+    //let video_settings = VideoSettingsBuilder::new(width, heigth);
     //video_settings = video_settings.sub_type(windows_capture::encoder::VideoSettingsSubType::H264);
     /*let encoder = VideoEncoder::new_from_stream(
       video_settings,
@@ -177,13 +274,15 @@ impl GraphicsCaptureApiHandler for Capture {
       ctx.flags.stream,
     ); */
     let h265capturer = H264Capturer::new(heigth as usize, width as usize);
-    let encoder = Encoder::new().unwrap();
+
     Ok(Capture {
       //encoder: Some(encoder),
       start: Instant::now(),
-      track: track,
+      //track: track,
       h265capturer: h265capturer,
-      encoder: encoder,
+      //frame: frame,
+      //track: track,
+      update: update,
       frame_count: 0,
       frame_count_since_reset: 0,
       last_reset: Instant::now(),
@@ -204,11 +303,14 @@ impl GraphicsCaptureApiHandler for Capture {
       return Ok(());
     }*/
 
+    let frame_data = frame
+      .buffer()
+      .unwrap()
+      .as_raw_buffer()
+      //.unwrap()
+      .to_vec();
+    self.update.send(frame_data).unwrap();
 
-    
-
-
-    let mut nals = Vec::new();
     self.frame_count_since_reset += 1;
 
     if self.last_frame_time == 0 {
@@ -216,38 +318,18 @@ impl GraphicsCaptureApiHandler for Capture {
     } else {
       let elapsed = frame.timespan().Duration - self.last_frame_time;
       self.last_frame_time = frame.timespan().Duration;
-      println!("Rust: on_frame_arrived {:?}", elapsed as f64 / 10000000.0);
+      //println!("Rust: on_frame_arrived {:?}", elapsed as f64 / 10000000.0);
     }
 
     let elapsed_since_reset = self.last_reset.elapsed();
     let fps = self.frame_count_since_reset as f64 / elapsed_since_reset.as_secs_f64();
-    print!(
-      "\rRecording for: {:.2} seconds | FPS: {:.2}",
-      self.start.elapsed().as_secs_f64(),
-      fps
-    );
+    /*  print!(
+          "\rRecording for: {:.2} seconds | FPS: {:.2}",
+          self.start.elapsed().as_secs_f64(),
+          fps
+        );
+    */
 
-    self.h265capturer.get_nals(
-      frame.buffer().unwrap().as_raw_buffer(),
-      &mut nals,
-      &mut self.encoder,
-    );
-    if nals.len() == 0 {
-      return Ok(());
-    }
-    let track = self.track.clone();
-    //println!("Rust: on_frame_arrived {:?}", frame.timespan().Duration);
-    tokio::spawn(async move {
-      for nal in nals {
-        track
-          .write_sample(&Sample {
-            data: nal.into(),
-            ..Default::default()
-          })
-          .await
-          .unwrap();
-      }
-    });
     //thread::sleep(Duration::from_millis(16));
 
     if elapsed_since_reset >= Duration::from_secs(1) {
@@ -562,15 +644,20 @@ impl WebRtcClass {
     //let mut ticker = tokio::time::interval(Duration::from_secs(1) / 60);
     //notify.notified().await;
     //let mut cap = H264Capturer::new();
+    let primary_monitor = Monitor::primary().expect("There is no primary monitor");
+    let height = primary_monitor.height().unwrap();
+    let width = primary_monitor.width().unwrap();
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+    let mut av1 = Av1Encoder::new(track, rx, width as usize, height as usize);
+    notify.notified().await;
+
     tokio::spawn(async move {
-      notify.notified().await;
       //let frame = c.frame
       println!("Rust: capture_screen");
-      let primary_monitor = Monitor::primary().expect("There is no primary monitor");
       let capture_settings = CaptureSettings {
-        track: track,
-        height: primary_monitor.height().unwrap(),
-        width: primary_monitor.width().unwrap(),
+        height: height,
+        width: width,
+        sender: tx,
       };
       let settings = Settings::new(
         // Item to capture
@@ -580,10 +667,13 @@ impl WebRtcClass {
         // Draw border settings
         DrawBorderSettings::Default,
         // The desired color format for the captured frame.
-        ColorFormat::Bgra8,
+        ColorFormat::Rgba8,
         capture_settings, // Additional flags for the capture settings that will be passed to user defined `new` function.
       );
-      Capture::start(settings);
+      Capture::start(settings).unwrap();
+    });
+    tokio::spawn(async move {
+      av1.start_encoding().await;
     });
   }
 
@@ -664,7 +754,7 @@ impl WebRtcClass {
     // add video track
     let video_track = Arc::new(TrackLocalStaticSample::new(
       RTCRtpCodecCapability {
-        mime_type: MIME_TYPE_H264.to_owned(),
+        mime_type: MIME_TYPE_AV1.to_owned(),
         ..Default::default()
       },
       "video".to_owned(),
@@ -672,7 +762,6 @@ impl WebRtcClass {
     ));
     let notify_tx = Arc::new(tokio::sync::Notify::new());
     let notify_video = notify_tx.clone();
-    Self::capture_screen(self, video_track.clone(), notify_video).await;
 
     let rtp_sender = self
       .peer_connection
@@ -719,6 +808,7 @@ impl WebRtcClass {
 
     self.setup_ice_candidates().await;
     println!("Rust: init 3");
+    Self::capture_screen(self, video_track.clone(), notify_video).await;
 
     //});
   }

@@ -23,8 +23,8 @@ callChannel.onConnection = (callRef, awnsRef) => {
           "turn:turn.cloudflare.com:3478?transport=udp",
           "turn:turn.cloudflare.com:3478?transport=tcp",
           "turns:turn.cloudflare.com:5349?transport=tcp"],
-        username: "REDACTED_TURN_USERNAME",
-        credential: "REDACTED_TURN_CREDENTIAL"
+        "username": "REDACTED_TURN_USERNAME",
+        "credential": "REDACTED_TURN_CREDENTIAL"
 
       }
     ]
