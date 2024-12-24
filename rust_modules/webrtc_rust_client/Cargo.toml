@@ -11,6 +11,7 @@ crate-type = ["cdylib"]
 napi = { version = "2.12.2", default-features = false, features = ["async", "compat-mode", "napi4", "tokio_rt"] }
 napi-derive = "2.12.2"
 notify = "7.0.0"
+nvidia-video-codec-sdk = "0.3.1"
 serde = "1.0.216"
 serde_json = "1.0.133"
 tokio = "1.42.0"
