@@ -4,7 +4,7 @@
         "rust_modules/webrtc_rust_client/Cargo.toml",
     ],
     "rust-analyzer.procMacro.ignored": {
-        "webrtc_rust_client": ["napi"]
+        "rust-analyzer.procMacro.ignored": { "napi-derive": ["napi"] }
     }
     
 }

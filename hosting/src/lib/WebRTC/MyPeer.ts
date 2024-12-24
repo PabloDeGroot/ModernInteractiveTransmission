@@ -52,11 +52,13 @@ const fetchIceServers = async () => {
 
 const initializeIceServers = async () => {
     const iceServers = await fetchIceServers();
+    iceServers
 
     const config: RTCConfiguration = {
         iceServers: [
             //{ urls: "stun:stun.my-stun-server.tld" },
-            { urls: "stun:stun.l.google.com:5349" },/*
+            //{ urls: "stun:stun.l.google.com:5349" },
+            /*
             { urls: "stun:stun1.l.google.com:3478" },
             { urls: "stun:stun1.l.google.com:5349" },
             { urls: "stun:stun2.l.google.com:19302" },
@@ -68,6 +70,8 @@ const initializeIceServers = async () => {
         ],
     };
 
+    //remove stun servers
+    iceServers.iceServers.urls = iceServers.iceServers.urls.filter( (server: string) => server.includes("stun"));
     config.iceServers?.push(iceServers.iceServers);
 
     console.log("Ice Servers", config);
