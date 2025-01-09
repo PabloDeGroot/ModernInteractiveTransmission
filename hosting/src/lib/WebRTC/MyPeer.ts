@@ -77,7 +77,13 @@ const initializeIceServers = async () => {
     console.log("Ice Servers", config);
     return config;
 };
-
+function getH264Profile(codec : RTCRtpCodec) {
+    if (codec.mimeType !== "video/H264" || codec.sdpFmtpLine === undefined) {
+        return undefined;
+    }
+    const n = codec.sdpFmtpLine.length;
+    return codec.sdpFmtpLine.substring(n - 6, n - 4);
+}
 //const config = await initializeIceServers();
 class MyPeerConnection {
     target: string;
@@ -101,6 +107,37 @@ class MyPeerConnection {
         this.myColor = myColor;
         initializeIceServers().then((config) => {
             this.pc = new RTCPeerConnection(config);
+            try {
+                const transceiver = this.pc.addTransceiver("video", { direction: "recvonly" });
+                if (transceiver.setCodecPreferences !== undefined) {
+                    const sorter = new Map();
+                    sorter.set("64", 0);
+                    sorter.set("4D", 1);
+                    sorter.set("42", 2);
+    
+                    const codecs = RTCRtpReceiver.getCapabilities("video")?.codecs;
+                    if(codecs === undefined) return;
+                    codecs.sort((a, b) => {
+                        let rankA = sorter.get(getH264Profile(a));
+                        if (rankA === undefined) {
+                            rankA = 10;
+                        }
+                        let rankB = sorter.get(getH264Profile(b));
+                        if (rankB === undefined) {
+                            rankB = 10;
+                        }
+                        return rankA - rankB;
+                    });
+                    for (const codec of codecs) {
+                        console.log(codec);
+                    }
+    
+                    transceiver.setCodecPreferences(codecs);
+                }
+            } catch (err) {
+                console.log(err);
+            }
+
             this.initPeerConnection();
             this.initSignaling();
             this.registerListeners();
@@ -169,7 +206,7 @@ class MyPeerConnection {
                 this.makingOffer = true;
                 await this.pc.setLocalDescription();
                 console.log("My Peer: Local description set", this.pc.localDescription);
-                this.signaler.send({ description: this.pc.localDescription, id: this.id, color: this.myColor, name: this.myname });
+                this.signaler.send({ description: this.pc.localDescription});
             } catch (err) {
                 console.error(err);
             } finally {
@@ -188,7 +225,7 @@ class MyPeerConnection {
         this.pc!.onicecandidate = (e) => {
             if (e.candidate === null) return;
             console.log("My Peer: ICE candidate", e.candidate);
-            this.signaler.send({ candidate: e.candidate, id: this.id, color: this.myColor, name: this.myname })
+            this.signaler.send({ candidate: e.candidate })
         };
     }
     ignoreOffer = false;
@@ -211,6 +248,7 @@ class MyPeerConnection {
                 //return;
             }
             if (id === this.id) {
+             
                 //return;
             }
             if (type == "close") {
@@ -231,13 +269,13 @@ class MyPeerConnection {
                         return;
                     }
                     this.isSettingRemoteAnswerPending = description.type == "answer";
-                    await this.pc!.setRemoteDescription(description);
+                    await this.pc!.setRemoteDescription(new RTCSessionDescription(description));
                     this.isSettingRemoteAnswerPending = false;
                     if (description.type === "offer") {
                         await this.pc!.setLocalDescription();
                         console.log("My Peer: Local description set", this.pc!.localDescription);
 
-                        this.signaler.send({ description: this.pc!.localDescription, id: this.id });
+                        this.signaler.send({ description: this.pc!.localDescription });
                     } /*else if (description.type === "answer") {
                         //this.signaler.send({ description: this.pc.localDescription, id: this.id });
                         this.changePlayOutDelay();

@@ -7,7 +7,8 @@ import MenuBuilder from './menu'
 import { Button, mouse, keyboard, KeyboardClass, Key } from "@nut-tree-fork/nut-js"
 import { on } from 'events'
 import { sendLeftClickAt, sendRightClickAt, sendMiddleClickAt, sendMouseMoveAt } from "@pablodegroot/virtual_input"
-import { WebRTC } from "webrtc_rust_client"
+//import { WebRTC } from "webrtc_rust_client"
+import { WebRTC } from "stream-napi"
 import { FirestoreCallChannel } from './signaling/FirestoreCallChannel'
 import { FirestoreSignalingChannel } from './signaling/FirestoreSignalingChannel'
 
@@ -32,10 +33,14 @@ callChannel.onConnection = (callRef, awnsRef) => {
     webrtc.onMessage((err, data) => {
       let message = JSON.parse(data);
       //console.log("onMessage", message);
+      //console.log("error", err);
       signaling.send(message);
     });
-    webrtc.start();
+    webrtc.init();
+    console.log("webrtc");
     signaling.onmessage = (message) => {
+      
+      //console.log("signaling message", message);
       let data = JSON.stringify(message);
       webrtc.sendMessage(data);
     }

@@ -47,6 +47,7 @@
 
     let signal = new FirestoreCallChannel(roomId);
     let test = new MyPeer(signal, uid!, name!, color);
+    
     test.onConnection = (conn) => {
         connections.push(conn);
         console.log("Room: Connection", conn);
@@ -72,6 +73,7 @@
         //     });
         // }
     };
+    test.call();
     console.log("Room: Peer", test.id);
 
     // FIRESTORE

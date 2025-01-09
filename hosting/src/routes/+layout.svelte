@@ -25,7 +25,7 @@
     afterNavigate((e) => {
         console.log("navigated", e);
         minimize = e.to?.params?.slug != null;
-        // gradient.initGradient("#gradient-canvas");
+        gradient.initGradient("#gradient-canvas");
     });
 
     // Call `initGradient` with the selector to your canvas

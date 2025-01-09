@@ -27,6 +27,7 @@
     "@pablodegroot/virtual_input": "^0.0.12",
     "firebase": "^11.0.2",
     "peerjs": "^1.5.4",
+    "stream-napi": "file:../desktop-streaming-napi/stream-napi",
     "svelte": "^5.5.0",
     "sveltefire": "^0.4.5",
     "webrtc_rust_client": "file:../rust_modules/webrtc_rust_client"

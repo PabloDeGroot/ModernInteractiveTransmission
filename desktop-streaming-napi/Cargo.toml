@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "stream-napi", "webrtc-helper"
+]
+exclude = ["nvenc-rs"]
+
+
+
+[profile.release]
+lto = true

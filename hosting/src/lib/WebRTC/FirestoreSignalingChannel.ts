@@ -25,6 +25,7 @@ class FirestoreSignalingChannel implements ISignalingChannel {
             console.log("Signaler: Emitting onmessage", doc.data());
             // get new data
             let alldata = doc.data()!.data as string[];
+            
             // get old data
             let oldData = this.data;
             // get the new data
@@ -32,7 +33,9 @@ class FirestoreSignalingChannel implements ISignalingChannel {
             this.data = { data: alldata };
             if (this.data.data.length > 20) { return }
             newData.forEach(d => {
-                this.onmessage?.(JSON.parse(d));
+                let data = JSON.parse(d);
+                console.log("Signaler: Emitting onmessage2", data);
+                this.onmessage?.(data);
             });
         });
 

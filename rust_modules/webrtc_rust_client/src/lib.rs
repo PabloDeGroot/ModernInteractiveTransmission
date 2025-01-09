@@ -27,14 +27,8 @@ use napi::{
   CallContext, Env, JsFunction, JsNumber, JsObject, JsString, JsUndefined, NapiValue, Property,
 };
 use notify::Result;
-use openh264::{
-  encoder::{EncodedBitStream, Encoder},
-  formats::{BgraSliceU8, RgbSliceU8, RgbaSliceU8, YUVBuffer, YUVSource},
-};
-use rav1e::{
-  color::ColorDescription, config::SpeedSettings, prelude::v_frame::frame, Config, Context,
-  EncoderConfig, EncoderStatus,
-};
+
+use nvenc_sys::{_NV_ENCODE_API_FUNCTION_LIST, _NV_ENC_OPEN_ENCODE_SESSIONEX_PARAMS};
 use serde::Serialize;
 use webrtc::{
   api::{
@@ -81,7 +75,7 @@ use windows::{
     Buffer, DataReader, DataWriter, IBuffer, IInputStream, IRandomAccessStream,
     InMemoryRandomAccessStream, RandomAccessStream, RandomAccessStreamOverStream,
   },
-  Win32::Devices::Display,
+  Win32::{Devices::Display, Graphics::Direct3D11::ID3D11Device},
 };
 use windows_capture::{
   capture::GraphicsCaptureApiHandler,
@@ -102,13 +96,73 @@ struct CaptureSettings {
   pub sender: Sender<Vec<u8>>,
 }
 unsafe impl Send for CaptureSettings {}
+struct NvidiaEncoder {
+  reciever: Receiver<Vec<u8>>,
+  track: Arc<TrackLocalStaticSample>,
+}
+impl NvidiaEncoder {
+  unsafe fn new(track: Arc<TrackLocalStaticSample>, reciever: Receiver<Vec<u8>>) -> Self {
+    let mut func: _NV_ENCODE_API_FUNCTION_LIST = Default::default();
+    let device = Self::create_d3d11_device().unwrap();
+    let encoder = nvenc::EncoderBuilder::new(device).unwrap();
+    encoder.with_codec(nvenc::Codec::H264).unwrap();
+  }
+  /// Create a new D3D11 device.
+  pub fn create_d3d11_device() -> Result<ID3D11Device> {
+    let feature_levels = [
+      Direct3D::D3D_FEATURE_LEVEL_12_1,
+      Direct3D::D3D_FEATURE_LEVEL_12_0,
+      Direct3D::D3D_FEATURE_LEVEL_11_1,
+      Direct3D::D3D_FEATURE_LEVEL_11_0,
+      Direct3D::D3D_FEATURE_LEVEL_10_1,
+      Direct3D::D3D_FEATURE_LEVEL_10_0,
+      Direct3D::D3D_FEATURE_LEVEL_9_1,
+    ];
 
+    #[cfg(debug_assertions)]
+    let flags = Direct3D11::D3D11_CREATE_DEVICE_DEBUG;
+
+    #[cfg(not(debug_assertions))]
+    let flags = Direct3D11::D3D11_CREATE_DEVICE_FLAG(0);
+
+    let mut device = None;
+
+    unsafe {
+      D3D11CreateDevice(
+        None,
+        D3D_DRIVER_TYPE_HARDWARE,
+        None,
+        flags,
+        Some(feature_levels.as_slice()),
+        D3D11_SDK_VERSION,
+        Some(&mut device),
+        None,
+        None,
+      )?;
+    }
+
+    let device = device.unwrap();
+    let device_context = unsafe {
+      let mut tmp = None;
+      device.GetImmediateContext(&mut tmp);
+      tmp.unwrap()
+    };
+
+    let multithreaded: ID3D11Multithread = device_context.cast().unwrap();
+    unsafe {
+      // Needed to prevent random deadlocks. The performance cost is quite negligible.
+      multithreaded.SetMultithreadProtected(true);
+    }
+
+    Ok(device)
+  }
+}
 struct Capture {
   // The video encoder that will be used to encode the frames.
   //encoder: Option<VideoEncoder>,
   start: Instant,
   //track: Arc<TrackLocalStaticSample>,
-  h265capturer: H264Capturer,
+
   //frame: Arc<Vec<u8>>,
   //context: Arc<Context<u8>>,
   frame_count: u32,
@@ -120,6 +174,8 @@ struct Capture {
   update: Sender<Vec<u8>>,
   //stream: IRandomAccessStream,
 }
+
+/*
 struct Av1Encoder {
   pub context: Context<u8>,
   width: usize,
@@ -127,6 +183,7 @@ struct Av1Encoder {
   reciever: Receiver<Vec<u8>>,
   track: Arc<TrackLocalStaticSample>,
 }
+
 impl Av1Encoder {
   fn new(
     track: Arc<TrackLocalStaticSample>,
@@ -250,6 +307,7 @@ impl Av1Encoder {
     }
   }
 }
+  */
 impl GraphicsCaptureApiHandler for Capture {
   type Flags = CaptureSettings;
 
@@ -273,13 +331,12 @@ impl GraphicsCaptureApiHandler for Capture {
       ContainerSettingsBuilder::default(),
       ctx.flags.stream,
     ); */
-    let h265capturer = H264Capturer::new(heigth as usize, width as usize);
 
     Ok(Capture {
       //encoder: Some(encoder),
       start: Instant::now(),
       //track: track,
-      h265capturer: h265capturer,
+
       //frame: frame,
       //track: track,
       update: update,
@@ -420,6 +477,7 @@ fn send_message(ctx: CallContext) -> napi::Result<JsUndefined> {
 
   ctx.env.get_undefined()
 }*/
+/*
 struct YuvWrapper<'a> {
   yuv: YuvPlanarImage<'a, u8>,
 }
@@ -554,6 +612,7 @@ impl H264Capturer {
     }
   }
 }
+  */
 /*
 impl Read for H264Capturer {
   fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
@@ -580,10 +639,10 @@ impl Read for H264Capturer {
     //return Ok(0);
     //todo!()
   }
-}*/
+}
 unsafe impl Send for H264Capturer {}
 unsafe impl Sync for H264Capturer {}
-
+*/
 #[napi(js_name = "WebRTC")]
 pub struct WebRtcClass {
   peer_connection: Option<Arc<RTCPeerConnection>>,
@@ -623,7 +682,7 @@ unsafe impl Send for WebRtcClass {}
 unsafe impl Sync for WebRtcClass {}
 #[napi]
 impl WebRtcClass {
-  #[napi(factory)]
+  //#[napi(factory)]
   pub async fn create(conf: Configuration) -> napi::Result<Self> {
     let web = WebRtcClass {
       peer_connection: None,
@@ -648,7 +707,7 @@ impl WebRtcClass {
     let height = primary_monitor.height().unwrap();
     let width = primary_monitor.width().unwrap();
     let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
-    let mut av1 = Av1Encoder::new(track, rx, width as usize, height as usize);
+    //let mut av1 = Av1Encoder::new(track, rx, width as usize, height as usize);
     notify.notified().await;
 
     tokio::spawn(async move {
@@ -671,10 +730,10 @@ impl WebRtcClass {
         capture_settings, // Additional flags for the capture settings that will be passed to user defined `new` function.
       );
       Capture::start(settings).unwrap();
-    });
-    tokio::spawn(async move {
-      av1.start_encoding().await;
-    });
+    }); /*
+        tokio::spawn(async move {
+          av1.start_encoding().await;
+        });*/
   }
 
   pub async fn init(&mut self) {
