@@ -13,7 +13,7 @@ napi-derive = "2.12.2"
 nvenc = { path = "../nvenc-rs/nvenc" }
 webrtc-helper = { path = "../webrtc-helper" }
 webrtc = "0.6.0"
-log = "0.4.0"
+log = { version = "0.4.0", features = ["release_max_level_trace"] }
 rand = "0.8.5"
 serde = "1.0.151"
 futures-util = "0.3.25"
@@ -21,6 +21,7 @@ async-trait = "0.1.57"
 serde_json = "1.0.91"
 tokio = { version = "1.25.0", features = ["full"] }
 warp = { version = "0.3.3", features = ["tls"] }
+openh264 = "0.6.0"
 
 [build-dependencies]
 napi-build = "2.0.1"

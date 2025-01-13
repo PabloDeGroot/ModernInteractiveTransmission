@@ -382,7 +382,7 @@ where
     ) -> Result<(), webrtc::Error> {
         loop {
             if let Ok(msg) = peer.signaler.recv().await {
-                println!( "msg: {:?}", msg);
+                //println!( "msg: {:?}", msg);
                 match msg {
                     Message::Sdp(sdp) => {
                         let sdp_type = sdp.sdp_type;

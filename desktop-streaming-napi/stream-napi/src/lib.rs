@@ -7,6 +7,7 @@ use napi::{
   JsFunction, JsObject,
 };
 use nvidia::NvidiaEncoderBuilder;
+use h264::H264EncoderBuilder;
 use tokio::sync::Mutex;
 use webrtc::ice_transport::ice_server::RTCIceServer;
 use webrtc_helper::{peer::Role, Message, WebRtcBuilder};
@@ -14,6 +15,7 @@ use webrtc_helper::{peer::Role, Message, WebRtcBuilder};
 mod capture;
 mod device;
 mod nvidia;
+mod h264;
 mod signaler;
 
 
@@ -96,7 +98,7 @@ impl WebRtc {
 
   #[napi]
   pub async fn send_message(&self, message: String) -> napi::Result<()> {
-    println!("send_message: {:?}", message);
+    //println!("send_message: {:?}", message);
     let tx = self.tx.lock().await;
     let msg: Message = serde_json::from_str(&message).unwrap();
     tx.send(msg)
@@ -156,7 +158,7 @@ impl WebRtc {
     tokio::spawn(async move {
       let mut encoder_builder = WebRtcBuilder::new(signaler, Role::Answerer);
       encoder_builder
-        .with_encoder(Box::new(NvidiaEncoderBuilder::new(
+        .with_encoder(Box::new(H264EncoderBuilder::new(
           "display-mirror".to_owned(),
           "0".to_owned(),
         )));

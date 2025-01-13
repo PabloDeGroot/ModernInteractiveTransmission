@@ -62,7 +62,7 @@ impl Signaler for NapiSignaler {
   async fn recv(&self) -> Result<Message, Box<dyn std::error::Error + Send>> {
     match self.recv_impl().await {
       Ok(msg) => {
-        print!("recv: {:?}", msg);
+        //print!("recv: {:?}", msg);
         Ok(msg)
       },
       Err(e) => Err(Box::new(e)),
@@ -70,7 +70,7 @@ impl Signaler for NapiSignaler {
   }
 
   async fn send(&self, msg: Message) -> Result<(), Box<dyn std::error::Error + Send>> {
-    println!("send: {:?}", msg);
+    //println!("send: {:?}", msg);
     match self.send_impl(msg).await {
       Ok(_) => Ok(()),
       Err(e) => Err(Box::new(e)),
