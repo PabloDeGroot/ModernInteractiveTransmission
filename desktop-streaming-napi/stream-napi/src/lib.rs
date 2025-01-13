@@ -1,23 +1,26 @@
-use std::sync::Arc;
+use std::{future::Future, pin::Pin, sync::Arc, thread, time::Duration};
 
+use capture::ScreenDuplicator;
 use napi::{
   bindgen_prelude::FromNapiValue,
   sys,
-  threadsafe_function::{ErrorStrategy, ThreadSafeCallContext, ThreadsafeFunction},
+  threadsafe_function::{ErrorStrategy, ThreadSafeCallContext, ThreadsafeFunction, ThreadsafeFunctionCallMode},
   JsFunction, JsObject,
 };
 use nvidia::NvidiaEncoderBuilder;
-use h264::H264EncoderBuilder;
+//use h264::H264EncoderBuilder;
 use tokio::sync::Mutex;
-use webrtc::ice_transport::ice_server::RTCIceServer;
+use webrtc::{data::data_channel::DataChannel, data_channel::RTCDataChannel, ice_transport::ice_server::RTCIceServer};
 use webrtc_helper::{peer::Role, Message, WebRtcBuilder};
+use windows::{core::HRESULT, Win32::{Foundation::ERROR_NOT_READY, Graphics::Dxgi::Common::{
+  DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R10G10B10A2_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM,
+}}};
 
 mod capture;
 mod device;
-mod nvidia;
 mod h264;
+mod nvidia;
 mod signaler;
-
 
 #[macro_use]
 extern crate napi_derive;
@@ -26,6 +29,50 @@ extern crate napi_derive;
 pub fn sum(a: i32, b: i32) -> i32 {
   a + b
 } */
+
+
+pub fn data_handler(
+  data_channel: Arc<RTCDataChannel>,
+  callback : Option<ThreadsafeFunction<String>>,
+) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> {
+  Box::pin(async move {
+    let data_channel = Arc::clone(&data_channel);
+    let data_channel_2 = Arc::clone(&data_channel);
+    data_channel_2.on_open(Box::new(move || {
+      Box::pin(async move {
+        let raw = match data_channel.detach().await {
+          Ok(raw) => raw,
+          Err(err) => {
+            log::error!("data channel detach got err: {}", err);
+            return;
+          }
+        };
+
+        let raw = Arc::clone(&raw);
+        tokio::spawn(async move {
+          let _ = control_loop(raw,callback).await;
+        });
+      })
+    }));
+  })
+}
+async fn control_loop(data_channel: Arc<DataChannel>, callback : Option<ThreadsafeFunction<String>>) {
+  //let device = PointerDevice::new().expect("Failed to create `PointerDevice`");
+  let mut buffer = vec![0u8; 1500];
+
+
+  while let Ok((n, is_string)) = data_channel.read_data_channel(&mut buffer).await {
+    if !is_string {
+      continue;
+    }
+    if let Ok(s) = std::str::from_utf8(&buffer[..n]) {
+      log::info!("Received: {}", s);
+      if let Some(callback) = callback.clone() {
+        callback.call(Ok(s.to_string()),ThreadsafeFunctionCallMode::Blocking);
+      }
+    }
+  }
+}
 
 #[napi]
 pub struct IceServer {
@@ -74,6 +121,7 @@ impl FromNapiValue for Configuration {
 #[napi(js_name = "WebRTC")]
 pub struct WebRtc {
   send_callback: Option<ThreadsafeFunction<String>>,
+  data_callback: Option<ThreadsafeFunction<String>>,
   config: Configuration,
 
   tx: Mutex<tokio::sync::mpsc::Sender<Message>>,
@@ -88,7 +136,7 @@ impl WebRtc {
       tx: Mutex::new(tx),
       rx: Arc::new(Mutex::new(rx)),
       config: conf,
-
+      data_callback: None,
       send_callback: None,
       //capturer: Arc::new(scrap::Capturer::new(scrap::Display::primary().unwrap()).unwrap()),
     };
@@ -119,6 +167,20 @@ impl WebRtc {
     self.send_callback = Some(tsfn);
     //self.init().await;
   }
+  #[napi(ts_args_type = "callback: (err:null|Error, result: string) => void")]
+  pub fn on_data(&mut self, callback: JsFunction) {
+    let tsfn: ThreadsafeFunction<String, ErrorStrategy::CalleeHandled> = callback
+      .create_threadsafe_function(0, |ctx: ThreadSafeCallContext<String>| {
+        ctx
+          .env
+          .create_string(&ctx.value)
+          .map(|js_value| vec![js_value])
+      })
+      .unwrap();
+    self.data_callback = Some(tsfn);
+  }
+
+
   #[napi]
   pub fn init(&self) {
     let send_callback = self.send_callback.clone();
@@ -133,6 +195,22 @@ impl WebRtc {
         credential_type: webrtc::ice_transport::ice_credential_type::RTCIceCredentialType::Password,
       })
       .collect();
+    /*
+    let device = crate::device::create_d3d11_device().unwrap();
+    let duplicator = ScreenDuplicator::new(
+        device,
+        0,
+        vec![
+            DXGI_FORMAT_B8G8R8A8_UNORM,
+            DXGI_FORMAT_R10G10B10A2_UNORM,
+            DXGI_FORMAT_R8G8B8A8_UNORM,
+        ],
+    )
+    .unwrap();
+    let desc = duplicator.desc();
+    println!("desc: {:?}", desc);
+    */
+
     /*
        tokio::spawn(async move {
          let signaler = signaler::NapiSignaler::new(rx, send_callback.unwrap());
@@ -154,15 +232,21 @@ impl WebRtc {
      });
     */
     let signaler = signaler::NapiSignaler::new(rx, send_callback.unwrap());
-
+    let data_callback = self.data_callback.clone();
     tokio::spawn(async move {
+      let data: Option<ThreadsafeFunction<String>> = data_callback.clone();
       let mut encoder_builder = WebRtcBuilder::new(signaler, Role::Answerer);
       encoder_builder
-        .with_encoder(Box::new(H264EncoderBuilder::new(
+        .with_encoder(Box::new(NvidiaEncoderBuilder::new(
           "display-mirror".to_owned(),
           "0".to_owned(),
-        )));
-        //.with_data_channel_handler(Box::new(controls_handler));
+        )))
+        .with_data_channel_handler(Box::new(move|data_channel|{
+          let data_clone = data.clone();
+          data_handler(data_channel, data_clone)
+        } ));
+      //thread::sleep(Duration::from_secs(3));
+      //.with_data_channel_handler(Box::new(controls_handler));
       let encoder = encoder_builder.build().await.unwrap();
       encoder.is_closed().await;
       //DUPLICATOR_RUNNING.store(false, Ordering::Release);

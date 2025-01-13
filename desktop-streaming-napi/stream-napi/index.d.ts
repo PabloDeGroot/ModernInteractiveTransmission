@@ -16,5 +16,6 @@ export declare class WebRTC {
   static create(conf: Configuration): Promise<WebRtc>
   sendMessage(message: string): Promise<void>
   onMessage(callback: (err:null|Error, result: string) => void): void
+  onData(callback: (err:null|Error, result: string) => void): void
   init(): void
 }

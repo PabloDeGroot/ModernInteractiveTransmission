@@ -261,7 +261,7 @@ class MyPeer {
     onConnection?: (peer: MyPeerConnection) => void;
     onCall?: () => void;
     call = () => {
-        this.caller.call(this.id)
+        //this.caller.call(this.id)
     }
     close = () => {
         this.conns.forEach((conn) => conn.close());
@@ -276,7 +276,7 @@ class MyPeer {
         this.caller = caller;
         this.id = id;
         //this.id = Math.floor(Math.random() * 1000000);
-        this.initCalls();
+        //this.initCalls();
 
     }
     initCalls = () => {

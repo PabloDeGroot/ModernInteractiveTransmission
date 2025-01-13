@@ -71,13 +71,13 @@ const initializeIceServers = async () => {
     };
 
     //remove stun servers
-    iceServers.iceServers.urls = iceServers.iceServers.urls.filter( (server: string) => server.includes("stun"));
+    iceServers.iceServers.urls = iceServers.iceServers.urls.filter((server: string) => server.includes("stun"));
     config.iceServers?.push(iceServers.iceServers);
 
     console.log("Ice Servers", config);
     return config;
 };
-function getH264Profile(codec : RTCRtpCodec) {
+function getH264Profile(codec: RTCRtpCodec) {
     if (codec.mimeType !== "video/H264" || codec.sdpFmtpLine === undefined) {
         return undefined;
     }
@@ -114,9 +114,9 @@ class MyPeerConnection {
                     sorter.set("64", 0);
                     sorter.set("4D", 1);
                     sorter.set("42", 2);
-    
+
                     const codecs = RTCRtpReceiver.getCapabilities("video")?.codecs;
-                    if(codecs === undefined) return;
+                    if (codecs === undefined) return;
                     codecs.sort((a, b) => {
                         let rankA = sorter.get(getH264Profile(a));
                         if (rankA === undefined) {
@@ -131,42 +131,42 @@ class MyPeerConnection {
                     for (const codec of codecs) {
                         console.log(codec);
                     }
-    
+
                     transceiver.setCodecPreferences(codecs);
                 }
             } catch (err) {
                 console.log(err);
             }
+            this.data = this.pc.createDataChannel("data");
 
             this.initPeerConnection();
             this.initSignaling();
             this.registerListeners();
             this.pc.ondatachannel = ((e) => {
                 console.log("My Peer: Data channel created", e.channel);
-                this.data = e.channel;
-                this.data.onclose = () => {
-                    console.log("My Peer: Data channel closed");
-                    this.cleanup();
-                }
-                this.data.addEventListener('message', (e) => {
-                    if (typeof e.data === "string") {
-                        console.log("My Peer: Data channel message", e.data);
-                    }
-                    if (e.data == "close") {
-                        this.cleanup();
-                    }
-                });
-                this.data.onerror = (e) => {
-                    console.error(e);
-                    this.cleanup();
-                }
-                this.data.onclosing = () => {
-                    console.log("My Peer: Data channel closing");
-                    this.cleanup();
-
-                }
-
             });
+            this.data.onclose = () => {
+                console.log("My Peer: Data channel closed");
+                this.cleanup();
+            }
+            this.data.addEventListener('message', (e) => {
+                if (typeof e.data === "string") {
+                    console.log("My Peer: Data channel message", e.data);
+                }
+                if (e.data == "close") {
+                    this.cleanup();
+                }
+            });
+            this.data.onerror = (e) => {
+                console.error(e);
+                this.cleanup();
+            }
+            this.data.onclosing = () => {
+                console.log("My Peer: Data channel closing");
+                this.cleanup();
+
+            }
+
             this.onPcReady?.();
         });
         console.log("My Peer: Created", this.id, this.target);
@@ -206,7 +206,7 @@ class MyPeerConnection {
                 this.makingOffer = true;
                 await this.pc.setLocalDescription();
                 console.log("My Peer: Local description set", this.pc.localDescription);
-                this.signaler.send({ description: this.pc.localDescription});
+                this.signaler.send({ description: this.pc.localDescription });
             } catch (err) {
                 console.error(err);
             } finally {
@@ -248,7 +248,7 @@ class MyPeerConnection {
                 //return;
             }
             if (id === this.id) {
-             
+
                 //return;
             }
             if (type == "close") {

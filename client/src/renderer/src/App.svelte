@@ -59,6 +59,9 @@
     console.log('Clearing Objects')
     objectColection.Clear()
   })
+  api.onData((data: any) => {
+    console.log('Renderer data', data)
+  })
   api.getUserId().then((data: any) => {
     userId = data
   })

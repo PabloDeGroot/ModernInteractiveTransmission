@@ -10,6 +10,12 @@ const api = {
       console.log("preload: clearAll");
     });
   },
+  onData(func: (data: any) => void) {
+    ipcRenderer.on('data', (e, data)=>{
+      func(data);
+      console.log("preload: data");
+    });
+  },
 
   //ipcMain.on('clickMouse', async (event, arg) => {
   clickMouse(x: number, y: number, type: string) {

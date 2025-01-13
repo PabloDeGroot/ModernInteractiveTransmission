@@ -49,20 +49,22 @@ impl ScreenDuplicator {
     ) -> Result<ScreenDuplicator, windows::core::Error> {
         let supported_formats = supported_formats.into_boxed_slice();
         let is_dpi_aware = ScreenDuplicator::try_set_dpi_aware()?;
+        println!("is_dpi_aware: {:?}", is_dpi_aware);
         let dxgi_device: IDXGIDevice = d3d11_device.cast()?;
-
+        println!("dxgi_device");
         // SAFETY: Windows API call
         let dxgi_output = unsafe {
             let adapter = dxgi_device.GetAdapter()?;
             adapter.EnumOutputs(display_index)?
         };
-
+        println!("dxgi_output");
         let output_dupl = ScreenDuplicator::new_output_duplicator(
             &dxgi_output,
             &dxgi_device,
             &supported_formats,
             is_dpi_aware,
         )?;
+        println!("output_dupl");
 
         Ok(ScreenDuplicator {
             output_dupl,
@@ -103,6 +105,8 @@ impl ScreenDuplicator {
                 &mut resource,
             )
         };
+        
+ 
 
         match result {
             Ok(_) => {
@@ -171,12 +175,17 @@ impl ScreenDuplicator {
         // First test if output_dupl can be made with IDXGIOutput5
         if is_dpi_aware {
             unsafe {
+                println!("IDXGIOutput5");
                 let hdr_output: IDXGIOutput5 = dxgi_output.cast()?;
-
+                println!("IDXGIOutput5 2 2, {:?}", dxgi_device);
+                println!("IDXGIOutput5 2 3, {:?}", RESERVED_FLAG);
+                println!("IDXGIOutput5 2 1, {:?}", supported_formats);
                 const RESERVED_FLAG: u32 = 0;
                 let output_dupl =
                     hdr_output.DuplicateOutput1(dxgi_device, RESERVED_FLAG, supported_formats);
+                println!("IDXGIOutput5 3");
                 if output_dupl.is_ok() {
+                    println!("output_dupl ok");
                     return output_dupl;
                 }
             }
@@ -184,7 +193,9 @@ impl ScreenDuplicator {
 
         // If either not DPI aware or IDXGIOutput5 failed, fall back to IDXGIOutput1
         unsafe {
+            println!("IDXGIOutput1");
             let sdr_output: IDXGIOutput1 = dxgi_output.cast()?;
+            println!("IDXGIOutput1 2");
             sdr_output.DuplicateOutput(dxgi_device)
         }
     }

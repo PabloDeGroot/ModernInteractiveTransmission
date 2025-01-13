@@ -13,10 +13,10 @@ import { FirestoreCallChannel } from './signaling/FirestoreCallChannel'
 import { FirestoreSignalingChannel } from './signaling/FirestoreSignalingChannel'
 
 
-let callChannel = new FirestoreCallChannel("room2");
+let callChannel = new FirestoreCallChannel("room3");
 callChannel.call("app_test");
 callChannel.onConnection = (callRef, awnsRef) => {
-  let signaling = new FirestoreSignalingChannel("room2", callRef, awnsRef);
+  let signaling = new FirestoreSignalingChannel("room3", callRef, awnsRef);
   WebRTC.create({
     iceServers: [
       {
@@ -35,7 +35,17 @@ callChannel.onConnection = (callRef, awnsRef) => {
       //console.log("onMessage", message);
       //console.log("error", err);
       signaling.send(message);
+      
     });
+    webrtc.onData((err,data)=>{
+      if(err){
+        console.log("error",err);
+        return;
+      }
+      let message = JSON.parse(data);
+      console.log("onData", message);
+      ipcMain.emit("data",message);
+    })
     webrtc.init();
     console.log("webrtc");
     signaling.onmessage = (message) => {
@@ -68,8 +78,6 @@ function createWindow(): void {
     frame: false,
     width: width,
     height: height,
-
-
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       nodeIntegration: true,
@@ -79,13 +87,13 @@ function createWindow(): void {
     }
   })
 
-  mainWindow.setAlwaysOnTop(true);
-  mainWindow.setIgnoreMouseEvents(true);
-  mainWindow.setFullScreenable(false);
-  mainWindow.setKiosk(true);
-  mainWindow.setMenu(null);
-  mainWindow.setMovable(false);
-  mainWindow.setFocusable(false);
+  //mainWindow.setAlwaysOnTop(true);
+  //mainWindow.setIgnoreMouseEvents(true);
+  //mainWindow.setFullScreenable(false);
+  //mainWindow.setKiosk(true);
+  //mainWindow.setMenu(null);
+  //mainWindow.setMovable(false);
+  //mainWindow.setFocusable(false);
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
@@ -120,7 +128,7 @@ app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
-
+    return;
     if (!request.audioRequested) {
       desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
 
