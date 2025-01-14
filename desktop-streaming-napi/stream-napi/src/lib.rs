@@ -1,8 +1,9 @@
 use std::{future::Future, pin::Pin, sync::Arc, thread, time::Duration};
 
 use capture::ScreenDuplicator;
+use h264::H264EncoderBuilder;
 use napi::{
-  bindgen_prelude::FromNapiValue,
+  bindgen_prelude::{FromNapiValue, Null},
   sys,
   threadsafe_function::{ErrorStrategy, ThreadSafeCallContext, ThreadsafeFunction, ThreadsafeFunctionCallMode},
   JsFunction, JsObject,
@@ -21,7 +22,9 @@ mod device;
 mod h264;
 mod nvidia;
 mod signaler;
-
+mod tex_reader;
+mod texture;
+mod error;
 #[macro_use]
 extern crate napi_derive;
 /*
@@ -122,6 +125,7 @@ impl FromNapiValue for Configuration {
 pub struct WebRtc {
   send_callback: Option<ThreadsafeFunction<String>>,
   data_callback: Option<ThreadsafeFunction<String>>,
+  close_callback: Option<ThreadsafeFunction<Null>>,
   config: Configuration,
 
   tx: Mutex<tokio::sync::mpsc::Sender<Message>>,
@@ -138,6 +142,7 @@ impl WebRtc {
       config: conf,
       data_callback: None,
       send_callback: None,
+      close_callback: None,
       //capturer: Arc::new(scrap::Capturer::new(scrap::Display::primary().unwrap()).unwrap()),
     };
 
@@ -178,6 +183,16 @@ impl WebRtc {
       })
       .unwrap();
     self.data_callback = Some(tsfn);
+  }
+
+  #[napi(ts_args_type = "callback: (err:null|Error) => void")]
+  pub fn on_close(&mut self, _callback: JsFunction) {
+    let tsfn: ThreadsafeFunction<Null, ErrorStrategy::CalleeHandled> = _callback
+      .create_threadsafe_function(0, |ctx: ThreadSafeCallContext<Null>| {
+        ctx.env.get_undefined().map(|js_value| vec![js_value])
+      })
+      .unwrap();
+    self.close_callback = Some(tsfn);
   }
 
 
@@ -233,11 +248,12 @@ impl WebRtc {
     */
     let signaler = signaler::NapiSignaler::new(rx, send_callback.unwrap());
     let data_callback = self.data_callback.clone();
+    let close_callback = self.close_callback.clone();
     tokio::spawn(async move {
       let data: Option<ThreadsafeFunction<String>> = data_callback.clone();
       let mut encoder_builder = WebRtcBuilder::new(signaler, Role::Answerer);
       encoder_builder
-        .with_encoder(Box::new(NvidiaEncoderBuilder::new(
+        .with_encoder(Box::new(H264EncoderBuilder::new(
           "display-mirror".to_owned(),
           "0".to_owned(),
         )))
@@ -248,7 +264,9 @@ impl WebRtc {
       //thread::sleep(Duration::from_secs(3));
       //.with_data_channel_handler(Box::new(controls_handler));
       let encoder = encoder_builder.build().await.unwrap();
+
       encoder.is_closed().await;
+      close_callback.unwrap().call(Ok(Null),ThreadsafeFunctionCallMode::Blocking);
       //DUPLICATOR_RUNNING.store(false, Ordering::Release);
       log::info!("Exited");
     });

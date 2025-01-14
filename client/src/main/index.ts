@@ -11,11 +11,14 @@ import { sendLeftClickAt, sendRightClickAt, sendMiddleClickAt, sendMouseMoveAt }
 import { WebRTC } from "stream-napi"
 import { FirestoreCallChannel } from './signaling/FirestoreCallChannel'
 import { FirestoreSignalingChannel } from './signaling/FirestoreSignalingChannel'
+import { i } from 'vite/dist/node/types.d-aGj9QkWt'
 
 
 let callChannel = new FirestoreCallChannel("room3");
-callChannel.call("app_test");
+callChannel.call("app_test"); // todo:  either this or the hosting one is redundants
 callChannel.onConnection = (callRef, awnsRef) => {
+  let connectionGuid = callRef.id;
+  ipcMain.emit("connection", connectionGuid);
   let signaling = new FirestoreSignalingChannel("room3", callRef, awnsRef);
   WebRTC.create({
     iceServers: [
@@ -36,21 +39,24 @@ callChannel.onConnection = (callRef, awnsRef) => {
       //console.log("onMessage", message);
       //console.log("error", err);
       signaling.send(message);
-      
+
     });
-    webrtc.onData((err,data)=>{
-      if(err){
-        console.log("error",err);
+    webrtc.onData((err, data) => {
+      if (err) {
+        console.log("error", err);
         return;
       }
       let message = JSON.parse(data);
       console.log("onData", message);
-      ipcMain.emit("data",message);
+      ipcMain.emit(connectionGuid, message);
     })
+    webrtc.onClose(() => {
+      console.log("onClose");
+      ipcMain.emit("close", connectionGuid);
+    });
     webrtc.init();
     console.log("webrtc");
     signaling.onmessage = (message) => {
-      
       //console.log("signaling message", message);
       let data = JSON.stringify(message);
       webrtc.sendMessage(data);
