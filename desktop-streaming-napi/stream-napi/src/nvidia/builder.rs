@@ -173,7 +173,7 @@ impl EncoderBuilder for NvidiaEncoderBuilder {
       codec_capability.clock_rate,
       self.dupl_rx,
       self.dupl_desc.ModeDesc.RefreshRate.Numerator,
-      self.dupl_desc.ModeDesc.RefreshRate.Denominator,
+      self.dupl_desc.ModeDesc.RefreshRate.Numerator,
     ));
   }
 }
