@@ -3,15 +3,27 @@ import { electronAPI } from '@electron-toolkit/preload'
 
 // Custom APIs for renderer
 const api = {
-  
+
   onClearAll(func: () => void) {
-    ipcRenderer.on('clearAll', (e)=>{
+    ipcRenderer.on('clearAll', (_e) => {
       func();
       console.log("preload: clearAll");
     });
   },
-  onData(func: (data: any) => void) {
-    ipcRenderer.on('data', (e, data)=>{
+  onConnection(func: (id:string) => void) {
+    ipcRenderer.on('connection', (_e, id) => {
+      func(id);
+      console.log("preload: connection");
+    });
+  },
+  onClose(func: (id :string) => void) {
+    ipcRenderer.on('close', (_e, id) => {
+      func(id);
+      console.log("preload: close");
+    });
+  },
+  onData(id: string, func: (data: any) => void) {
+    ipcRenderer.on(id, (_e, data) => {
       func(data);
       console.log("preload: data");
     });
@@ -37,8 +49,8 @@ const api = {
   },
   getRoom() {
     ipcRenderer.send('getRoom');
-    return new Promise((resolve, reject) => {
-      ipcRenderer.on('getRoom', (event, arg) => {
+    return new Promise((resolve, _reject) => {
+      ipcRenderer.on('getRoom', (_event, arg) => {
         console.log("room1", arg);
         resolve(arg);
       });
@@ -47,8 +59,8 @@ const api = {
   },
   getUserId() {
     ipcRenderer.send('getUserId');
-    return new Promise((resolve, reject) => {
-      ipcRenderer.on('getUserId', (event, arg) => {
+    return new Promise((resolve, _reject) => {
+      ipcRenderer.on('getUserId', (_event, arg) => {
         resolve(arg);
       });
     }

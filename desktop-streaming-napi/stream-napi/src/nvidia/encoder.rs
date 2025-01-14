@@ -78,11 +78,12 @@ impl NvidiaEncoderInput {
 
     fn encode(&mut self) -> Result<(), nvenc::NvEncError> {
         match self.screen_duplicator.acquire_frame(4294967295u32) {
-            Ok((acquired_image, info)) => {
-                let timestamp = info.LastPresentTime as u64;
+            Ok(acquired_image) => {
+                //let timestamp = info.LastPresentTime as u64;
                 // Check if image was updated
-                if timestamp != 0 {
-                    self.input.encode_frame(acquired_image, timestamp)?;
+                let time = acquired_image.timestamp;
+                if time != 0 {
+                    self.input.encode_frame(acquired_image, time)?;
                 }
                 Ok(())
             }

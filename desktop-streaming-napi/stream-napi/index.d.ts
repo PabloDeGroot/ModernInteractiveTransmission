@@ -17,5 +17,6 @@ export declare class WebRTC {
   sendMessage(message: string): Promise<void>
   onMessage(callback: (err:null|Error, result: string) => void): void
   onData(callback: (err:null|Error, result: string) => void): void
+  onClose(callback: (err:null|Error) => void): void
   init(): void
 }

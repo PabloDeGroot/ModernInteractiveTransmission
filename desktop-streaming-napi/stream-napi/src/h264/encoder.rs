@@ -1,6 +1,8 @@
 use crate::{
   capture::{AcquireFrameError, ScreenDuplicator},
   device,
+  tex_reader::{self, TextureReader},
+  texture::Texture,
 };
 use openh264::{
   formats::{BgraSliceU8, RGB8Source, YUVBuffer, YUVSource},
@@ -30,7 +32,7 @@ use webrtc_helper::{
 };
 use windows::Win32::{
   Graphics::Direct3D11::{
-    ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D, D3D11_MAPPED_SUBRESOURCE,
+    ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D, D3D11_MAPPED_SUBRESOURCE, D3D11_MAP_READ,
     D3D11_MAP_READ_WRITE, D3D11_TEXTURE2D_DESC,
   },
   System::Performance::QueryPerformanceFrequency,
@@ -48,53 +50,48 @@ enum RtcpEvent {
 }
 struct Encoder {
   sender: Sender<Vec<u8>>,
+  device: ID3D11Device,
+  context: ID3D11DeviceContext,
 }
 
 impl Encoder {
-  pub fn new(sender: Sender<Vec<u8>>) -> Encoder {
-    Encoder { sender }
+  pub fn new(
+    sender: Sender<Vec<u8>>,
+    device: ID3D11Device,
+    context: ID3D11DeviceContext,
+  ) -> Encoder {
+    Encoder {
+      sender,
+      device,
+      context,
+    }
   }
 
-  pub unsafe fn encode_frame(
-    &mut self,
-    texture: &ID3D11Texture2D,
-    device: &ID3D11Device,
-    context: &ID3D11DeviceContext,
-    timestamp: u64,
-  ) -> Result<(), Error> {
-    println!("Encoding frame");
-
+  pub unsafe fn encode_frame(&self, texture: ID3D11Texture2D, timestamp: u64) -> Result<(), Error> {
     let desc = {
       let mut desc = D3D11_TEXTURE2D_DESC::default();
       texture.GetDesc(&mut desc);
       desc
     };
 
-    println!("Get desc {:?}", desc);
-
-    let mapped_resource = (*context).Map(texture, 0, D3D11_MAP_READ_WRITE, 0);
-    let mapped_resource = mapped_resource.unwrap();
-    let bytes = mapped_resource.RowPitch as usize * desc.Height as usize;
-    let slice = std::slice::from_raw_parts(mapped_resource.pData as *const u8, bytes);
-
-    println!("Sliced frame");
+    let tex = Texture::new(texture, timestamp);
+    let mut tex_reader = TextureReader::new(self.device.clone(), self.context.clone());
+    let mut bytes: Vec<u8> = Vec::new();
+    tex_reader.get_data(&mut bytes, &tex).unwrap();
 
     let mut encoder = openh264::encoder::Encoder::new().unwrap();
-    let brga = BgraSliceU8::new(slice, (desc.Width as usize, desc.Height as usize));
+    let brga = BgraSliceU8::new(&bytes, (desc.Width as usize, desc.Height as usize));
     let buf = YUVBuffer::from_rgb_source(brga);
     let stream = encoder.encode(&buf);
     let stream = stream.unwrap();
     self.sender.try_send(stream.to_vec()).unwrap();
     //(*context).as_ref().unwrap().Unmap(&texture, 0);
-    println!("Encoded frame");
 
     Ok(())
   }
 }
 struct H264EncoderInput {
   screen_duplicator: ScreenDuplicator,
-  device: ID3D11Device,
-  context: ID3D11DeviceContext,
   input: Encoder,
   bandwidth_estimate: TwccBandwidthEstimate,
   frame_rate_num: u32,
@@ -118,7 +115,7 @@ impl H264EncoderInput {
         display_desc.ModeDesc.RefreshRate.Numerator,
       )
     };
-    let  input = Encoder::new(sender);
+    let input = Encoder::new(sender, device, context);
     H264EncoderInput {
       screen_duplicator,
       input,
@@ -126,8 +123,6 @@ impl H264EncoderInput {
       frame_rate_num,
       frame_rate_den,
       rtcp_rx,
-        device,
-        context,
     }
   }
 
@@ -146,16 +141,20 @@ impl H264EncoderInput {
 
   fn encode(&mut self) -> Result<(), Error> {
     match self.screen_duplicator.acquire_frame(4294967295u32) {
-      Ok((acquired_image, info)) => {
-        let timestamp = info.LastPresentTime as u64;
+      Ok(acquired_image) => {
+        //let timestamp = acquired_image.as_raw_ref.LastPresentTime as u64;
         // Check if image was updated
         unsafe {
-          if timestamp != 0 {
-            self
-              .input
-              .encode_frame(acquired_image.as_ref(),&self.device, &self.context, timestamp);
-          }
+          //if timestamp != 0 {
+          self
+            .input
+            .encode_frame(
+              acquired_image.as_raw_ref().clone(),
+              acquired_image.timestamp,
+            )
+            .unwrap();
         }
+        //}
         Ok(())
       }
       Err(e) => match e {
@@ -246,8 +245,8 @@ impl H264EncoderOutput {
     });
 
     encode_result*/
-    let slice = self.output.blocking_recv().unwrap();
     handle.block_on(async {
+      let slice = self.output.recv().await.unwrap();
       self
         .payloader
         .send_payload(RTP_MTU - 12, &mut self.header, &slice, &*self.rtp_track)
@@ -318,7 +317,7 @@ pub async fn start_encoder(
   ssrc: u32,
   clock_rate: u32,
   device: ID3D11Device,
-    context: ID3D11DeviceContext,
+  context: ID3D11DeviceContext,
 ) {
   println!("Starting encoder");
   while *ice_connection_state.borrow() != RTCIceConnectionState::Connected {
@@ -338,7 +337,14 @@ pub async fn start_encoder(
     ssrc,
   ));
 
-  let mut input = H264EncoderInput::new(screen_duplicator, sender, bandwidth_estimate, rtcp_rx, device, context);
+  let mut input = H264EncoderInput::new(
+    screen_duplicator,
+    sender,
+    bandwidth_estimate,
+    rtcp_rx,
+    device,
+    context,
+  );
   let mut output = H264EncoderOutput::new(output, rtp_track, payload_type, ssrc, clock_rate);
 
   let ice_1 = ice_connection_state;

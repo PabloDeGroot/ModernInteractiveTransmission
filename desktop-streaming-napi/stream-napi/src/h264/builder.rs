@@ -1,5 +1,8 @@
 use super::encoder::start_encoder;
-use crate::{capture::ScreenDuplicator, device::create_d3d11_device};
+use crate::{
+  capture::ScreenDuplicator,
+  device::{create_d3d11_device, create_d3d11_device_context},
+};
 use std::{collections::HashMap, sync::Arc};
 use webrtc::{
   rtp_transceiver::{rtp_codec::RTCRtpCodecCapability, RTCRtpTransceiver},
@@ -61,52 +64,21 @@ impl EncoderBuilder for H264EncoderBuilder {
     }
     println!("display_index: {:?}", self.display_index);
     println!("display_formats: {:?}", self.display_formats);
-    let screen_duplicator =
-      match ScreenDuplicator::new(self.device.clone(), self.display_index, self.display_formats) {
-        Ok(duplicator) => duplicator,
-        Err(e) => {
-          panic!("Failed to create `ScreenDuplicator`: {e}");
-        }
-      };
-
-    /*let (preset, tuning_info, multi_pass, _rc_mode) = if new_settings {
-        // Equivalent settings for the old LowLatencyDefault and CBR_HQ:
-        // https://docs.nvidia.com/video-technologies/video-codec-sdk/nvenc-preset-migration-guide/
-        (
-
-            Option::<()>::None, // TODO: Implement RC mode settings
-        )
-    } else {
-        todo!("Need to first implement RC mode settings in nvenc")
-    };*/
-    /*
-    let configure_encoder =
-        |builder: &mut nvenc::EncoderBuilder<nvenc::DirectX11Device>| -> nvenc::Result<()> {
-            builder
-                .with_codec_profile(profile)?
-                .with_encode_preset(preset)?
-                .with_tuning_info(tuning_info)?
-                .set_multi_pass(multi_pass)?;
-            // TODO: set_rc_mode(rc_mode)
-            Ok(())
-        };
-
-        if let Err(e) = configure_encoder(&mut self.inner_builder) {
-        panic!("Error configuring encoder: {e}");
-    }
-
-        */
-    /*let (width, height, texture_format) = {
-        let display_desc = screen_duplicator.desc();
-        let mode_desc = &display_desc.ModeDesc;
-        (mode_desc.Width, mode_desc.Height, mode_desc.Format)
+    let screen_duplicator = match ScreenDuplicator::new(
+      self.device.clone(),
+      self.context.clone(),
+      self.display_index,
+      self.display_formats,
+    ) {
+      Ok(duplicator) => duplicator,
+      Err(e) => {
+        panic!("Failed to create `ScreenDuplicator`: {e}");
+      }
     };
-    */
 
     let handle = tokio::runtime::Handle::current();
     let (sender, reciever) = tokio::sync::mpsc::channel::<Vec<u8>>(1);
 
-    
     handle.spawn(start_encoder(
       screen_duplicator,
       reciever,
@@ -126,17 +98,14 @@ impl EncoderBuilder for H264EncoderBuilder {
 
 impl H264EncoderBuilder {
   pub fn new(id: String, stream_id: String) -> H264EncoderBuilder {
-    log::info!("H264EncoderBuilder::new");
-    let device = match create_d3d11_device() {
+    println!("H264EncoderBuilder::new");
+    let (device, context) = match create_d3d11_device_context() {
       Ok(device) => device,
       Err(e) => {
         panic!("Unable to create D3D11Device: {e}");
       }
     };
-
-    let context: *mut Option<windows::Win32::Graphics::Direct3D11::ID3D11DeviceContext> =
-      std::ptr::null_mut();
-    unsafe { device.GetImmediateContext(context) };
+    println!("H264EncoderBuilder::new: device created");
 
     let display_index = 0; // default to the first; could be changed later
     let display_formats = vec![
@@ -145,10 +114,9 @@ impl H264EncoderBuilder {
       DXGI_FORMAT_R8G8B8A8_UNORM,
     ];
 
-    //println!("Supported codecs:{:?}", supported_codecs);
     let mut suported_codecs: Vec<Codec> = Vec::new();
     suported_codecs.push(H264Codec::constrained_baseline().into());
-    let ctx = unsafe { (*context).clone() }.unwrap()    ;
+    println!("Supported codecs:{:?}", suported_codecs);
     H264EncoderBuilder {
       id,
       stream_id,
@@ -156,7 +124,7 @@ impl H264EncoderBuilder {
       display_formats,
       suported_codecs,
       device: device,
-      context:ctx,
+      context: context,
     }
   }
 

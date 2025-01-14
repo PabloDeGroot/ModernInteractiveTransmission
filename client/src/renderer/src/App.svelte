@@ -1,16 +1,17 @@
 <script lang="ts">
   //import GetRoom, { type Room, type UserRoom } from '../firebase/Room'
-  import { FirestoreCallChannel } from '../WebRTC/FirestoreCallChannel'
-  import MyPeer, { MyPeerConnection } from '../WebRTC/MyPeer'
+  //import { FirestoreCallChannel } from '../WebRTC/FirestoreCallChannel'
+  //import MyPeer, { MyPeerConnection } from '../WebRTC/MyPeer'
   import Canvas from './components/Canvas.svelte'
   import Object from './components/Objects/Object.svelte'
   import ObjectCollection from './components/Objects/ObjectCollection.svelte'
   import Presence from './components/Presence.svelte'
-  import User from './components/User.svelte'
+  //import User from './components/User.svelte'
+  import Users from './components/Users.svelte'
 
   let roomName = $state<string | null>(null)
   let userId = $state<string | null>(null)
-  let callChannel = $derived(roomName != null ? new FirestoreCallChannel(roomName) : null)
+  /* let callChannel = $derived(roomName != null ? new FirestoreCallChannel(roomName) : null)
   let peer = $derived(
     callChannel != null && userId != null ? new MyPeer(callChannel, userId) : null
   )
@@ -42,7 +43,7 @@
         conns = conns.filter((c) => c !== conn)
       }
     }
-    peer.call()
+    peer.call() 
   })
 
   let api = (window as any).api
@@ -65,6 +66,7 @@
   api.getUserId().then((data: any) => {
     userId = data
   })
+    */
   let canvas = $state<Canvas | null>(null)
   let draw = (
     lastPos: { x: number; y: number },
@@ -93,12 +95,14 @@
 {#if userId != null && roomName != null}
   <Presence uid={userId} roomID={roomName} />
 {/if}
+
+<!--
 {#if conns.length > 0 && media != null}
   {#each conns as conn}
     <User connection={conn} localStream={media} {draw} {getObject} {createObject} />
   {/each}
 {/if}
-{#if media != null}
-  <Canvas bind:this={canvas} />
-{/if}
+-->
+<Users {draw} {getObject} {createObject} />
+<Canvas bind:this={canvas} />
 <ObjectCollection bind:this={objectColection} />
