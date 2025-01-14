@@ -30,6 +30,7 @@ callChannel.onConnection = (callRef, awnsRef) => {
       }
     ]
   }).then((webrtc) => {
+    ipcMain.emit("connection", "")
     webrtc.onMessage((err, data) => {
       let message = JSON.parse(data);
       //console.log("onMessage", message);
