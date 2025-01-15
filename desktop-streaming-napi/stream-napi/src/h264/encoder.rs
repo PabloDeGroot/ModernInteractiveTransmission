@@ -8,6 +8,7 @@ use openh264::{
   formats::{BgraSliceU8, RGB8Source, YUVBuffer, YUVSource},
   Error,
 };
+use ring_channel::RingReceiver;
 use std::sync::Arc;
 use tokio::sync::{
   mpsc::Receiver,
@@ -91,33 +92,41 @@ impl Encoder {
   }
 }
 struct H264EncoderInput {
-  screen_duplicator: ScreenDuplicator,
+  //screen_duplicator: ScreenDuplicator,
   input: Encoder,
   bandwidth_estimate: TwccBandwidthEstimate,
   frame_rate_num: u32,
   frame_rate_den: u32,
   rtcp_rx: UnboundedReceiver<RtcpEvent>,
+  rx: RingReceiver<Texture>,
+
 }
 
 impl H264EncoderInput {
   fn new(
-    screen_duplicator: ScreenDuplicator,
+    rx: RingReceiver<Texture>,
+
+    //screen_duplicator: ScreenDuplicator,
     sender: Sender<Vec<u8>>,
     bandwidth_estimate: TwccBandwidthEstimate,
     rtcp_rx: UnboundedReceiver<RtcpEvent>,
     device: ID3D11Device,
     context: ID3D11DeviceContext,
+
+    frame_rate_num: u32,
+    frame_rate_den: u32,
   ) -> H264EncoderInput {
-    let (frame_rate_num, frame_rate_den) = {
+    /*let (frame_rate_num, frame_rate_den) = {
       let display_desc = screen_duplicator.desc();
       (
         display_desc.ModeDesc.RefreshRate.Numerator,
         display_desc.ModeDesc.RefreshRate.Numerator,
       )
-    };
+    };*/
     let input = Encoder::new(sender, device, context);
     H264EncoderInput {
-      screen_duplicator,
+      //screen_duplicator,
+      rx,
       input,
       bandwidth_estimate,
       frame_rate_num,
@@ -140,7 +149,7 @@ impl H264EncoderInput {
   }
 
   fn encode(&mut self) -> Result<(), Error> {
-    match self.screen_duplicator.acquire_frame(4294967295u32) {
+    match self.rx.recv() {
       Ok(acquired_image) => {
         //let timestamp = acquired_image.as_raw_ref.LastPresentTime as u64;
         // Check if image was updated
@@ -157,9 +166,10 @@ impl H264EncoderInput {
         //}
         Ok(())
       }
-      Err(e) => match e {
-        AcquireFrameError::Retry => Ok(()),
-        AcquireFrameError::Unknown => panic!("{:?}", e),
+      Err(e) => /*match e */ {
+        //AcquireFrameError::Retry => Ok(()),
+        //AcquireFrameError::Unknown => panic!("{:?}", e),
+        Ok(())
       },
     }
   }
@@ -255,7 +265,6 @@ impl H264EncoderOutput {
   }
 }
 
-
 async fn rtcp_handler(
   transceiver: Arc<RTCRtpTransceiver>,
   mut ice_connection_state: IceConnectionState,
@@ -307,7 +316,7 @@ async fn rtcp_handler(
 }
 
 pub async fn start_encoder(
-  screen_duplicator: ScreenDuplicator,
+  //screen_duplicator: ScreenDuplicator,
   output: Receiver<Vec<u8>>,
   sender: Sender<Vec<u8>>,
   rtp_track: Arc<TrackLocalStaticRTP>,
@@ -319,6 +328,10 @@ pub async fn start_encoder(
   clock_rate: u32,
   device: ID3D11Device,
   context: ID3D11DeviceContext,
+  rx: RingReceiver<Texture>,
+  
+  frame_rate_num: u32,
+  frame_rate_den: u32,
 ) {
   println!("Starting encoder");
   while *ice_connection_state.borrow() != RTCIceConnectionState::Connected {
@@ -338,14 +351,7 @@ pub async fn start_encoder(
     ssrc,
   ));
 
-  let mut input = H264EncoderInput::new(
-    screen_duplicator,
-    sender,
-    bandwidth_estimate,
-    rtcp_rx,
-    device,
-    context,
-  );
+  let mut input = H264EncoderInput::new(rx, sender, bandwidth_estimate, rtcp_rx, device, context, frame_rate_num, frame_rate_den);
   let mut output = H264EncoderOutput::new(output, rtp_track, payload_type, ssrc, clock_rate);
 
   let ice_1 = ice_connection_state;

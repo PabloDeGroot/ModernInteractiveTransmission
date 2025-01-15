@@ -2,6 +2,7 @@ use super::encoder::start_encoder;
 use crate::{
   capture::ScreenDuplicator,
   device::{create_d3d11_device, create_d3d11_device_context},
+  texture::Texture,
 };
 use std::{collections::HashMap, sync::Arc};
 use webrtc::{
@@ -16,9 +17,12 @@ use webrtc_helper::{
 };
 use windows::Win32::Graphics::{
   Direct3D11::{ID3D11Device, ID3D11DeviceContext},
-  Dxgi::Common::{
-    DXGI_FORMAT, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R10G10B10A2_UNORM,
-    DXGI_FORMAT_R8G8B8A8_UNORM,
+  Dxgi::{
+    Common::{
+      DXGI_FORMAT, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R10G10B10A2_UNORM,
+      DXGI_FORMAT_R8G8B8A8_UNORM,
+    },
+    DXGI_OUTDUPL_DESC,
   },
 };
 
@@ -30,6 +34,9 @@ pub struct H264EncoderBuilder {
   display_index: u32,
   display_formats: Vec<DXGI_FORMAT>,
   suported_codecs: Vec<Codec>,
+  dupl_rx: ring_channel::RingReceiver<Texture>,
+
+  dupl_desc: DXGI_OUTDUPL_DESC,
 }
 
 impl EncoderBuilder for H264EncoderBuilder {
@@ -64,7 +71,8 @@ impl EncoderBuilder for H264EncoderBuilder {
     }
     println!("display_index: {:?}", self.display_index);
     println!("display_formats: {:?}", self.display_formats);
-    let screen_duplicator = match ScreenDuplicator::new(
+
+    /*let screen_duplicator = match ScreenDuplicator::new(
       self.device.clone(),
       self.context.clone(),
       self.display_index,
@@ -75,12 +83,13 @@ impl EncoderBuilder for H264EncoderBuilder {
         panic!("Failed to create `ScreenDuplicator`: {e}");
       }
     };
+    */
 
     let handle = tokio::runtime::Handle::current();
     let (sender, reciever) = tokio::sync::mpsc::channel::<Vec<u8>>(1);
 
     handle.spawn(start_encoder(
-      screen_duplicator,
+      //screen_duplicator,
       reciever,
       sender,
       rtp_track,
@@ -92,21 +101,31 @@ impl EncoderBuilder for H264EncoderBuilder {
       codec_capability.clock_rate,
       self.device,
       self.context,
+      self.dupl_rx,
+      self.dupl_desc.ModeDesc.RefreshRate.Numerator,
+      self.dupl_desc.ModeDesc.RefreshRate.Numerator,
     ));
   }
 }
 
 impl H264EncoderBuilder {
-  pub fn new(id: String, stream_id: String) -> H264EncoderBuilder {
+  pub fn new(
+    id: String,
+    stream_id: String,
+    device: ID3D11Device,
+    context: ID3D11DeviceContext,
+    rx: ring_channel::RingReceiver<Texture>,
+    dupl_desc: DXGI_OUTDUPL_DESC,
+  ) -> H264EncoderBuilder {
     println!("H264EncoderBuilder::new");
-    let (device, context) = match create_d3d11_device_context() {
-      Ok(device) => device,
-      Err(e) => {
-        panic!("Unable to create D3D11Device: {e}");
-      }
-    };
-    println!("H264EncoderBuilder::new: device created");
-
+    /*let (device, context) = match create_d3d11_device_context() {
+          Ok(device) => device,
+          Err(e) => {
+            panic!("Unable to create D3D11Device: {e}");
+          }
+        };
+        println!("H264EncoderBuilder::new: device created");
+    */
     let display_index = 0; // default to the first; could be changed later
     let display_formats = vec![
       DXGI_FORMAT_B8G8R8A8_UNORM,
@@ -125,6 +144,8 @@ impl H264EncoderBuilder {
       suported_codecs,
       device: device,
       context: context,
+      dupl_rx: rx,
+      dupl_desc,
     }
   }
 

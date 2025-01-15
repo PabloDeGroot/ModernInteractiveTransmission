@@ -256,7 +256,7 @@ impl WebRtc {
       let data: Option<ThreadsafeFunction<String>> = data_callback.clone();
       let mut encoder_builder = WebRtcBuilder::new(signaler, Role::Answerer);
       encoder_builder
-        .with_encoder(Box::new(NvidiaEncoderBuilder::new(
+        .with_encoder(Box::new(H264EncoderBuilder::new(
           "display-mirror".to_owned(),
           "0".to_owned(),
           capture_loop.device.clone(),

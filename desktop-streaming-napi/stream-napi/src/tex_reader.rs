@@ -60,7 +60,7 @@ impl TextureReader {
         .ctx
         .CopyResource(self.tex.as_mut().unwrap().as_raw_ref(), tex.as_raw_ref());
     }
-    unsafe { self.ctx.Flush() }
+   // unsafe { self.ctx.Flush() }
     let raw_tex = self.tex.as_mut().unwrap().as_raw_ref();
     unsafe {
       let sub_res_res = self.ctx.Map(raw_tex, 0, D3D11_MAP_READ, 0);
@@ -131,13 +131,15 @@ impl TextureReader {
         let new_tex = self.device.CreateTexture2D(&desc, None);
 
         if let Err(e) = new_tex {
+          println!("deviced removed, reason: {:?}", self.device.GetDeviceRemovedReason());
+
           return Err(DDApiError::Unexpected(format!(
             "failed to create texture. {:?}",
             e
           )));
         }
 
-        self.tex = Some(Texture::new(new_tex.unwrap(),0))
+        self.tex = Some(Texture::new(new_tex.unwrap(),tex.timestamp));
       }
     }
 

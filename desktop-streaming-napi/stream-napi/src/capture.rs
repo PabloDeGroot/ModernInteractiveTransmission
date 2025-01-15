@@ -201,6 +201,10 @@ impl ScreenDuplicator {
     //let mut resource = None;
 
     // SAFETY: Windows API call
+
+
+
+
     let result = unsafe {
       self.output_dupl.AcquireNextFrame(
         timeout_millis,
@@ -213,21 +217,22 @@ impl ScreenDuplicator {
         DXGI_ERROR_ACCESS_LOST => {
           println!("display access lost. maybe desktop mode switch?, {:?}", e);
           //self.reacquire_dup()?;
-          return Err(AcquireFrameError::Unknown);
+          return Err(AcquireFrameError::AccessLost);
         }
         DXGI_ERROR_ACCESS_DENIED => {
           println!("display access is denied. Maybe running in a secure environment?");
           //self.reacquire_dup()?;
-          return Err(AcquireFrameError::Unknown);
+          return Err(AcquireFrameError::AccessDenied);
         }
         DXGI_ERROR_INVALID_CALL => {
           println!("dxgi_error_invalid_call. maybe forgot to ReleaseFrame()?");
           //self.reacquire_dup()?;
-          return Err(AcquireFrameError::Unknown);
+          return Err(AcquireFrameError::InvalidCall);
         }
         DXGI_ERROR_WAIT_TIMEOUT => {
           println!("no new frame is available");
-          return Err(AcquireFrameError::Unknown);
+          self.release_locked_frame();
+          return Err(AcquireFrameError::NoFrameAbailable);
         }
         _ => {
           return Err(AcquireFrameError::Unknown);
@@ -255,7 +260,7 @@ impl ScreenDuplicator {
       self.ensure_cache_frame(&new_frame).inspect_err(|_| {
         self.release_locked_frame();
       })?;
-      println!("frame acquired new_frame, info: {:?}", new_frame.timestamp);
+      //println!("frame acquired new_frame, info: {:?}", new_frame.timestamp);
 
       unsafe {
         self.d3d_ctx.CopyResource(
@@ -575,6 +580,10 @@ impl<'a> AsRef<ID3D11Texture2D> for AcquiredFrame<'a> {
 #[derive(Debug)]
 pub enum AcquireFrameError {
   Retry,
+  NoFrameAbailable,
+  InvalidCall,
+  AccessLost,
+  AccessDenied,
   Unknown,
 }
 
