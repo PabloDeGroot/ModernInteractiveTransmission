@@ -2,6 +2,7 @@ use crate::{
   capture::{AcquireFrameError, ScreenDuplicator},
   texture::Texture,
 };
+use parking_lot::Mutex;
 use ring_channel::RingReceiver;
 use std::sync::Arc;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -20,7 +21,10 @@ use webrtc::{
 use webrtc_helper::{
   codecs::H264SampleSender, interceptor::twcc::TwccBandwidthEstimate, peer::IceConnectionState,
 };
-use windows::Win32::System::Performance::QueryPerformanceFrequency;
+use windows::Win32::{
+  Graphics::Direct3D11::{ID3D11Device, ID3D11DeviceContext},
+  System::Performance::QueryPerformanceFrequency,
+};
 
 const RTP_MTU: usize = 1200;
 const RTCP_MAX_MTU: usize = 1500;
@@ -40,13 +44,13 @@ struct NvidiaEncoderInput {
   frame_rate_num: u32,
   frame_rate_den: u32,
   rtcp_rx: UnboundedReceiver<RtcpEvent>,
-  rx: RingReceiver<Texture>,
+  screen_duplicator: Arc<Mutex<ScreenDuplicator>>,
 }
 
 impl NvidiaEncoderInput {
   fn new(
-    //screen_duplicator: ScreenDuplicator,
-    rx: RingReceiver<Texture>,
+    screen_duplicator: Arc<Mutex<ScreenDuplicator>>,
+
     input: nvenc::EncoderInput<nvenc::DirectX11Device>,
     bandwidth_estimate: TwccBandwidthEstimate,
     rtcp_rx: UnboundedReceiver<RtcpEvent>,
@@ -62,13 +66,12 @@ impl NvidiaEncoderInput {
     };*/
 
     NvidiaEncoderInput {
-      //screen_duplicator,
+      screen_duplicator,
       input,
       bandwidth_estimate,
       frame_rate_num,
       frame_rate_den,
       rtcp_rx,
-      rx,
     }
   }
 
@@ -81,14 +84,13 @@ impl NvidiaEncoderInput {
       .input
       .update_average_bitrate(bitrate, Some(vbv_buffer_size))
     {
-      log::error!("Error trying to update bitrate: {e}");
+      println!("Error trying to update bitrate: {e}");
     }
   }
 
-  fn encode(&mut self) -> Result<(), nvenc::NvEncError> {
-    match self.rx.recv() {
+  async fn encode(&mut self) -> Result<(), nvenc::NvEncError> {
+    let res = match self.screen_duplicator.lock().acquire_frame(10000) {
       Ok(acquired_image) => {
-        println!("Received frame {:?}", acquired_image.timestamp);
 
         //let timestamp = info.LastPresentTime as u64;
         // Check if image was updated
@@ -102,7 +104,8 @@ impl NvidiaEncoderInput {
         println!("Error receiving frame: {:?}", e);
         Ok(())
       }
-    }
+    };
+    res
   }
 }
 
@@ -181,7 +184,7 @@ impl NvidiaEncoderOutput {
       });
 
       if let Err(e) = write_result {
-        log::error!("Error writing RTP: {e}");
+        println!("Error writing RTP: {e}");
       }
     });
 
@@ -234,7 +237,7 @@ async fn rtcp_handler(
     }
   }
   let _ = transceiver.stop().await;
-  log::info!("RTCP handler exited");
+  println!("RTCP handler exited");
 }
 
 pub async fn start_encoder(
@@ -248,13 +251,16 @@ pub async fn start_encoder(
   payload_type: u8,
   ssrc: u32,
   clock_rate: u32,
-  rx: RingReceiver<Texture>,
+  device: ID3D11Device,
+  context: ID3D11DeviceContext,
+  //rx: RingReceiver<Texture>,
   frame_rate_num: u32,
   frame_rate_den: u32,
+  dupl: Arc<Mutex<ScreenDuplicator>>,
 ) {
   while *ice_connection_state.borrow() != RTCIceConnectionState::Connected {
     if let Err(_) = ice_connection_state.changed().await {
-      log::error!("Peer exited before ICE became connected");
+      println!("Peer exited before ICE became connected");
       return;
     }
   }
@@ -270,7 +276,7 @@ pub async fn start_encoder(
   ));
 
   let mut input = NvidiaEncoderInput::new(
-    rx,
+    dupl,
     input,
     bandwidth_estimate,
     rtcp_rx,
@@ -284,49 +290,60 @@ pub async fn start_encoder(
 
   tokio::spawn(tokio::task::unconstrained(async move {
     // TODO: Frame interval should be configurable and/or signaled in SDP
-    let mut interval = tokio::time::interval(std::time::Duration::from_nanos(16_666_667));
+    let mut interval = tokio::time::interval(std::time::Duration::from_millis(1000 / 30));
+    //let mut interval = tokio::time::interval(std::time::Duration::from_nanos(2));
+
     while *ice_1.borrow() == RTCIceConnectionState::Connected {
       // TODO: *Average* frame interval is correct but the min/max is off by a lot
-      tokio::select! {
-          _ = interval.tick() => {
-              if let Err(e) = input.encode() {
-                  log::error!("Error encoding: {e}");
-              }
-          }
-          msg = input.rtcp_rx.recv() => {
-              match msg {
-                  Some(event) => match event {
-                      RtcpEvent::Pli => {
-                          // FIXME: Properly handle SSRC
-                          input.input.force_idr_on_next();
-                          log::info!("PLI received");
-                      }
-                      RtcpEvent::Fir => {
-                          // FIXME: Properly handle SSRC and seq nums
-                          input.input.force_idr_on_next();
-                          log::info!("FIR received");
-                      }
-                  }
-                  None => break,
-              }
-          }
-          _ = input.bandwidth_estimate.changed() => {
-              input.update_bitrate();
-          }
+      interval.tick().await;
+      //println!("tick");
+
+      if let Err(e) = input.encode().await {
+        println!("Error encoding: {e}");
       }
+
+     /*  tokio::select! {
+        _ = interval.tick() => {
+        //interval.tick().await;
+        if let Err(e) = input.encode().await {
+          println!("Error encoding: {e}");
+        }
+          }
+        /*msg = input.rtcp_rx.recv() => {
+            match msg {
+                Some(event) => match event {
+                    RtcpEvent::Pli => {
+                        // FIXME: Properly handle SSRC
+                        //input.input.force_idr_on_next();
+                        println!("PLI received");
+                    }
+                    RtcpEvent::Fir => {
+
+                        // FIXME: Properly handle SSRC and seq nums
+                        input.input.force_idr_on_next();
+                        println!("FIR received");
+                    }
+                }
+                None => break,
+            }
+        }*/
+        _ = input.bandwidth_estimate.changed() => {
+            input.update_bitrate();
+        }
+      }*/
     }
-    log::info!("Input thread exited");
+    println!("Input thread exited");
   }));
 
   let handle = tokio::runtime::Handle::current();
   std::thread::spawn(move || {
     while *ice_2.borrow() == RTCIceConnectionState::Connected {
       if let Err(e) = output.write_packets(&handle) {
-        log::error!("Error while waiting for output: {e}");
+        println!("Error while waiting for output: {e}");
         break;
       }
     }
-    log::info!("Output thread exited");
+    println!("Output thread exited");
   });
 }
 

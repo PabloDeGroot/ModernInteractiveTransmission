@@ -108,7 +108,6 @@ impl<D: DeviceImplTrait> EncoderInput<D> {
 
         // The flags are only good for one frame so we reset them after encoding
         self.encode_pic_params.encodePicFlags = 0;
-
         Ok(())
     }
 

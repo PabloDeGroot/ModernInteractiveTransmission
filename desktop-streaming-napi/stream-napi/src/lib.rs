@@ -64,7 +64,7 @@ pub fn data_handler(
         let raw = match data_channel.detach().await {
           Ok(raw) => raw,
           Err(err) => {
-            log::error!("data channel detach got err: {}", err);
+            println!("data channel detach got err: {}", err);
             return;
           }
         };
@@ -269,7 +269,7 @@ impl WebRtc {
       let mut encoder_builder = WebRtcBuilder::new(signaler, Role::Answerer);
 
       encoder_builder
-        .with_encoder(Box::new(H264EncoderBuilder::new(
+        .with_encoder(Box::new(NvidiaEncoderBuilder::new(
           "display-mirror".to_owned(),
           "0".to_owned(),
           capture_loop.clone(),
@@ -291,7 +291,7 @@ impl WebRtc {
         .unwrap()
         .call(Ok(Null), ThreadsafeFunctionCallMode::Blocking);
       //DUPLICATOR_RUNNING.store(false, Ordering::Release);
-      log::info!("Exited");
+      println!("Exited");
     });
   }
 }

@@ -8,9 +8,19 @@
   import Presence from './components/Presence.svelte'
   //import User from './components/User.svelte'
   import Users from './components/Users.svelte'
+  let api = (window as any).api
 
   let roomName = $state<string | null>(null)
   let userId = $state<string | null>(null)
+  api.onClearAll(() => {
+    console.log('Clearing')
+    if (canvas == null) return
+    console.log('Clearing Canvas')
+    canvas.Clear()
+    if (objectColection == null) return
+    console.log('Clearing Objects')
+    objectColection.Clear()
+  })
   /* let callChannel = $derived(roomName != null ? new FirestoreCallChannel(roomName) : null)
   let peer = $derived(
     callChannel != null && userId != null ? new MyPeer(callChannel, userId) : null

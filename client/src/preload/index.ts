@@ -4,33 +4,53 @@ import { electronAPI } from '@electron-toolkit/preload'
 // Custom APIs for renderer
 const api = {
 
+  data_callbacks: new Map<string, (data: any) => void>(),
+
+
   onClearAll(func: () => void) {
-    ipcRenderer.on('clearAll', (_e) => {
+    ipcRenderer.on('clearAll', (_e, args) => {
+      console.log("preload: clearAll");
       func();
       console.log("preload: clearAll");
     });
   },
-  onConnection(func: any) {
-    console.log("preload: onConnection", func);
-    ipcRenderer.on('connection', (_e, id) => {
+  onConnection(func: (id: string) => void) {
+    console.log("preload: onConnection");
 
-      try { func(id) } catch (e) { console.error(e) }
+    ipcRenderer.on('connection', (_e, id) => {
+      console.log("preload: connection, id: ", id);
+      func(id);
+      //try { func(id) } catch (e) { console.error(e) }
       console.log("preload: connection");
     });
+
   },
-  onClose(func: (id: string) => void) {
+  onClose(cb: (id: string) => void) {
     ipcRenderer.on('close', (_e, id) => {
-      func(id);
+      cb(id);
       console.log("preload: close");
     });
   },
-  onData(id: string, func: any) {
-    console.log("preload: data");
+  addData(id: string, func: (data: any) => void) {
+    console.log("preload: data id:", id);
+    ipcRenderer.on("data", (_e, args) => {
+      console.log("preload: data", args);
+      //if (args.id == id) {
+        func(args.data);
+      //}
 
-    ipcRenderer.on(id, (_e, data) => {
-      func(data);
+    });
+    //if (this.data_callbacks.size == 0) {
+    /*ipcRenderer.on('data', (_e, args: any) => {
+      console.log("preload: data", args);
+      //const cb = this.data_callbacks.get(args.id);
+      //if (cb) {
+      //  cb(args.data);
+      //}
       console.log("preload: data");
     });
+    //}
+    this.data_callbacks.set(id, func);*/
   },
 
   //ipcMain.on('clickMouse', async (event, arg) => {

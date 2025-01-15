@@ -42,20 +42,20 @@ function createWindow(): void {
     }
   })
 
-  //mainWindow.setAlwaysOnTop(true);
-  //mainWindow.setIgnoreMouseEvents(true);
-  //mainWindow.setFullScreenable(false);
-  //mainWindow.setKiosk(true);
-  //mainWindow.setMenu(null);
-  //mainWindow.setMovable(false);
-  //mainWindow.setFocusable(false);
+  mainWindow.setAlwaysOnTop(true);
+  mainWindow.setIgnoreMouseEvents(true);
+  mainWindow.setFullScreenable(false);
+  mainWindow.setKiosk(true);
+  mainWindow.setMenu(null);
+  mainWindow.setMovable(false);
+  mainWindow.setFocusable(false);
 
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
 
-
+  
 
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -97,13 +97,15 @@ function createWindow(): void {
             console.log("error", err);
             return;
           }
-          let message = JSON.parse(data);
+          console.log("onData");
+          //let message = JSON.parse(data);
           //console.log("onData", message);
-          ipcMain.emit(connectionGuid, message);
+          //mainWindow.webContents.send(connectionGuid, message);
+          //mainWindow.webContents.send("connection", connectionGuid);
         })
         webrtc.onClose(() => {
           console.log("onClose");
-          ipcMain.emit("close", connectionGuid);
+          mainWindow.webContents.send("close", connectionGuid);
         });
         webrtc.init(external);
         console.log("webrtc");

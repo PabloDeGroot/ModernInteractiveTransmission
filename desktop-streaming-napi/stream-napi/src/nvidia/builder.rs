@@ -5,6 +5,7 @@ use crate::{
   texture::Texture,
 };
 use std::{collections::HashMap, sync::Arc};
+use parking_lot::Mutex;
 use webrtc::{
   rtp_transceiver::{rtp_codec::RTCRtpCodecCapability, RTCRtpTransceiver},
   track::track_local::track_local_static_rtp::TrackLocalStaticRTP,
@@ -27,7 +28,7 @@ pub struct NvidiaEncoderBuilder {
   inner_builder: nvenc::EncoderBuilder<nvenc::DirectX11Device>,
   device: ID3D11Device,
   context: ID3D11DeviceContext,
-  dupl_rx: ring_channel::RingReceiver<Texture>,
+  dupl: Arc<Mutex<ScreenDuplicator>>,
   id: String,
   stream_id: String,
   display_index: u32,
@@ -171,9 +172,11 @@ impl EncoderBuilder for NvidiaEncoderBuilder {
       payload_type,
       ssrc,
       codec_capability.clock_rate,
-      self.dupl_rx,
+      self.device,
+      self.context,
       self.dupl_desc.ModeDesc.RefreshRate.Numerator,
       self.dupl_desc.ModeDesc.RefreshRate.Numerator,
+      self.dupl,
     ));
   }
 }
@@ -182,10 +185,10 @@ impl NvidiaEncoderBuilder {
   pub fn new(
     id: String,
     stream_id: String,
+    dupl: Arc<Mutex<ScreenDuplicator>>,
     device: ID3D11Device,
     context: ID3D11DeviceContext,
-    rx: ring_channel::RingReceiver<Texture>,
-    dupl_desc: DXGI_OUTDUPL_DESC,
+    desc : DXGI_OUTDUPL_DESC,
   ) -> NvidiaEncoderBuilder {
     log::info!("NvidiaEncoderBuilder::new");
     /*let (device, context) = match create_d3d11_device_context() {
@@ -201,7 +204,7 @@ impl NvidiaEncoderBuilder {
     let mut inner_builder = match nvenc::EncoderBuilder::new(device.clone()) {
       Ok(inner_builder) => inner_builder,
       Err(e) => {
-        log::error!("{e}");
+        println!("{e}");
         panic!("Error while creating the encoder: {e}");
       }
     };
@@ -232,8 +235,8 @@ impl NvidiaEncoderBuilder {
       display_index,
       display_formats,
       supported_codecs,
-      dupl_rx: rx,
-      dupl_desc
+      dupl: dupl,
+      dupl_desc: desc,
     }
   }
 

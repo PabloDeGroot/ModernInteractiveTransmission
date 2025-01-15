@@ -12,7 +12,8 @@ use windows::{
       },
       Dxgi::{
         Common::{
-          DXGI_FORMAT, DXGI_FORMAT_AYUV, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R10G10B10A2_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SAMPLE_DESC
+          DXGI_FORMAT, DXGI_FORMAT_AYUV, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R10G10B10A2_UNORM,
+          DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SAMPLE_DESC,
         },
         IDXGIDevice, IDXGIDevice4, IDXGIOutput, IDXGIOutput1, IDXGIOutput5, IDXGIOutputDuplication,
         IDXGIResource, IDXGISurface1, DXGI_ERROR_ACCESS_DENIED, DXGI_ERROR_ACCESS_LOST,
@@ -194,9 +195,7 @@ impl ScreenDuplicator {
     timeout_millis: u32,
   ) -> Result<Texture, AcquireFrameError> {
     let mut frame_info = Default::default();
-
     //let mut resource = None;
-
     // SAFETY: Windows API call
 
     let result = unsafe {
@@ -207,6 +206,7 @@ impl ScreenDuplicator {
       )
     };
     if let Err(e) = result {
+      println!("acquire_frame error: {:?}", e);
       match e.code() {
         DXGI_ERROR_ACCESS_LOST => {
           println!("display access lost. maybe desktop mode switch?, {:?}", e);
@@ -229,6 +229,7 @@ impl ScreenDuplicator {
           return Err(AcquireFrameError::NoFrameAbailable);
         }
         _ => {
+          println!("unknown error: {:?}", e);
           return Err(AcquireFrameError::Unknown);
         }
       }
@@ -257,18 +258,19 @@ impl ScreenDuplicator {
       //println!("frame acquired new_frame, info: {:?}", new_frame.timestamp);
 
       unsafe {
-        self.d3d_ctx.CopyResource(
+        let a = self.d3d_ctx.CopyResource(
           self.state.frame.as_ref().unwrap().as_raw_ref(),
           new_frame.as_raw_ref(),
         );
       }
     } else {
-      /*println!(
+      println!(
         "no fresh resource. accumulated {} frames",
         frame_info.AccumulatedFrames
-      );*/
+      );
     }
     if self.state.frame.is_none() {
+      println!("no frame");
       return Err(AcquireFrameError::Unknown);
     }
     self.release_locked_frame();
@@ -276,7 +278,6 @@ impl ScreenDuplicator {
     let cache_frame = self.state.frame.clone().unwrap();
 
     self.ensure_cache_cursor_frame(&cache_frame)?;
-
     let mut cache_cursor_frame = self.state.cursor_frame.clone().unwrap();
 
     unsafe {
@@ -284,9 +285,9 @@ impl ScreenDuplicator {
         .d3d_ctx
         .CopyResource(cache_cursor_frame.as_raw_ref(), cache_frame.as_raw_ref())
     }
-
     self.draw_cursor(&cache_cursor_frame)?;
     cache_cursor_frame.timestamp = frame_info.LastPresentTime as u64;
+
     Ok(cache_cursor_frame)
   }
 
@@ -410,7 +411,10 @@ impl ScreenDuplicator {
     }
 
     if self.state.frame_locked {
-      let _ = unsafe { self.output_dupl.ReleaseFrame() };
+      let res = unsafe { self.output_dupl.ReleaseFrame() };
+
+ 
+
       self.state.frame_locked = false;
     }
   }
@@ -626,6 +630,7 @@ impl ScreenDuplicator {
     };
     let cursor_present = unsafe { GetCursorInfo(&mut cursor_info as *mut CURSORINFO) };
 
+
     // if cursor is not present, return raw frame.
     if (!cursor_present).into() || (cursor_info.flags.0 & CURSOR_SHOWING.0 != CURSOR_SHOWING.0) {
       //debug!("cursor is absent so not drawing anything");
@@ -644,7 +649,6 @@ impl ScreenDuplicator {
       return Err(AcquireFrameError::Unknown);
     }
     let hdc = hdc.unwrap();
-
     let result = unsafe {
       DrawIconEx(
         hdc,
@@ -658,8 +662,12 @@ impl ScreenDuplicator {
         DI_NORMAL,
       )
     };
+    if !result.as_bool() {
+      println!("DrawIconEx failed");
+    }
 
     let _ = unsafe { surface.ReleaseDC(None) };
+
     Ok(())
   }
   fn draw_cursor2(

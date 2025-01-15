@@ -17,17 +17,19 @@
   }
 
   let { draw, getObject, createObject }: UsersProps = $props()
-  let components = $state<Record<string, User | null>>()
+  let components = $state<Record<string, User | null>>({})
   let keys = $state<string[]>([])
 
   let api = (window as any).api
   console.log('users')
-
+  api.addData('test', (data: any) => {
+    console.log('Data', data)
+  })
   api.onConnection((id: string) => {
-    console.log('Connection2', id)
+    console.log('render Connection', id)
     components[id] = null
     keys.push(id)
-    api.onData(id, (data: any) => {
+    api.addData(id, (data: any) => {
       console.log('Data', data)
       if (components[id] == null) return
       components[id].recieveData(data)
