@@ -127,6 +127,10 @@ impl ScreenDuplicator {
     }
   }
 
+  
+
+
+
   /// Get the next available frame.
   ///
   /// This method returns an `AcquiredFrame` on success. An error of value
