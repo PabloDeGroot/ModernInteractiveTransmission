@@ -12,8 +12,7 @@ use windows::{
       },
       Dxgi::{
         Common::{
-          DXGI_FORMAT, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R10G10B10A2_UNORM,
-          DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SAMPLE_DESC,
+          DXGI_FORMAT, DXGI_FORMAT_AYUV, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R10G10B10A2_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SAMPLE_DESC
         },
         IDXGIDevice, IDXGIDevice4, IDXGIOutput, IDXGIOutput1, IDXGIOutput5, IDXGIOutputDuplication,
         IDXGIResource, IDXGISurface1, DXGI_ERROR_ACCESS_DENIED, DXGI_ERROR_ACCESS_LOST,
@@ -41,7 +40,7 @@ use crate::{
 };
 
 #[derive(Default)]
-struct DuplicationState {
+pub struct DuplicationState {
   frame_locked: bool,
   last_resource: Option<IDXGIResource>,
 
@@ -61,7 +60,8 @@ impl DuplicationState {
     self.frame_locked = false;
   }
 }
-
+unsafe impl Send for DuplicationState {}
+unsafe impl Sync for DuplicationState {}
 #[repr(C)]
 pub struct ScreenDuplicator {
   /// Interface that does the duplication.
@@ -72,7 +72,7 @@ pub struct ScreenDuplicator {
   dxgi_device: IDXGIDevice,
   pub d3d11_device: ID3D11Device,
   pub d3d_ctx: ID3D11DeviceContext,
-  pub rx: ring_channel::RingReceiver<Texture>,
+  //pub rx: ring_channel::RingReceiver<Texture>,
   /// Texture formats that the duplicator can output
   supported_formats: Box<[DXGI_FORMAT]>,
   /// Cached result for the usage of IDXGIOutput5.
@@ -80,7 +80,7 @@ pub struct ScreenDuplicator {
   state: DuplicationState,
   last_frame_info: Option<DXGI_OUTDUPL_FRAME_INFO>,
   last_cursor_shape: Option<CursorShape>,
-  tx: ring_channel::RingSender<Texture>,
+  //tx: ring_channel::RingSender<Texture>,
 }
 
 impl Drop for ScreenDuplicator {
@@ -98,12 +98,13 @@ impl ScreenDuplicator {
     let (device, context) = create_d3d11_device_context().unwrap();
 
     let display_formats = vec![
+      //DXGI_FORMAT_AYUV,
       DXGI_FORMAT_B8G8R8A8_UNORM,
       DXGI_FORMAT_R10G10B10A2_UNORM,
       DXGI_FORMAT_R8G8B8A8_UNORM,
     ];
 
-    let mut screen_dup = ScreenDuplicator::new(device, context, 0, display_formats).unwrap();
+    let screen_dup = ScreenDuplicator::new(device, context, 0, display_formats).unwrap();
     Ok(screen_dup)
   }
   pub fn new(
@@ -144,12 +145,12 @@ impl ScreenDuplicator {
       state: Default::default(),
       last_frame_info: None,
       last_cursor_shape: None,
-      tx: tx,
-      rx: rx,
+      //tx: tx,
+      //rx: rx,
     })
   }
 
-  pub fn start_capture_loop(screen_dup: Arc<Mutex<Self>>) {
+  /*pub fn start_capture_loop(screen_dup: Arc<Mutex<Self>>) {
     //let duplicator = Arc::clone(&screenDup);
 
     tokio::spawn(async move {
@@ -171,7 +172,7 @@ impl ScreenDuplicator {
         //tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
       }
     });
-  }
+  } */
 
   /// Returns a description of the display that is currently being duplicated.
   pub fn desc(&self) -> DXGI_OUTDUPL_DESC {
@@ -182,10 +183,6 @@ impl ScreenDuplicator {
       dupl_desc.assume_init()
     }
   }
-
-  
-
-
 
   /// Get the next available frame.
   ///
@@ -201,9 +198,6 @@ impl ScreenDuplicator {
     //let mut resource = None;
 
     // SAFETY: Windows API call
-
-
-
 
     let result = unsafe {
       self.output_dupl.AcquireNextFrame(
@@ -296,6 +290,111 @@ impl ScreenDuplicator {
     Ok(cache_cursor_frame)
   }
 
+  #[inline]
+  pub fn acquire_frame2(
+    &self,
+    state: &mut DuplicationState,
+    last_frame_info: &mut Option<DXGI_OUTDUPL_FRAME_INFO>,
+    last_cursor_shape: &mut Option<CursorShape>,
+    timeout_millis: u32,
+  ) -> Result<Texture, AcquireFrameError> {
+    let mut frame_info = Default::default();
+
+    //let mut resource = None;
+
+    // SAFETY: Windows API call
+
+    let result = unsafe {
+      self
+        .output_dupl
+        .AcquireNextFrame(timeout_millis, &mut frame_info, &mut state.last_resource)
+    };
+    if let Err(e) = result {
+      match e.code() {
+        DXGI_ERROR_ACCESS_LOST => {
+          println!("display access lost. maybe desktop mode switch?, {:?}", e);
+          //self.reacquire_dup()?;
+          return Err(AcquireFrameError::AccessLost);
+        }
+        DXGI_ERROR_ACCESS_DENIED => {
+          println!("display access is denied. Maybe running in a secure environment?");
+          //self.reacquire_dup()?;
+          return Err(AcquireFrameError::AccessDenied);
+        }
+        DXGI_ERROR_INVALID_CALL => {
+          println!("dxgi_error_invalid_call. maybe forgot to ReleaseFrame()?");
+          //self.reacquire_dup()?;
+          return Err(AcquireFrameError::InvalidCall);
+        }
+        DXGI_ERROR_WAIT_TIMEOUT => {
+          println!("no new frame is available");
+          self.release_locked_frame2(state);
+          return Err(AcquireFrameError::NoFrameAbailable);
+        }
+        _ => {
+          return Err(AcquireFrameError::Unknown);
+        }
+      }
+    } else {
+      *last_frame_info = Some(frame_info);
+      if frame_info.PointerShapeBufferSize != 0 {
+        let mut shape = CursorShape::default();
+        self._get_cursor_shape2(&mut shape, last_frame_info)?;
+        *last_cursor_shape = Some(shape);
+      }
+    }
+
+    if let Some(resource) = self.state.last_resource.as_ref() {
+      /*println!(
+        "got fresh resource. accumulated {} frames",
+        frame_info.AccumulatedFrames
+      );*/
+      state.frame_locked = true;
+      let new_frame = Texture::new(
+        resource.cast().unwrap(),
+        self.last_frame_info.unwrap().LastPresentTime as u64,
+      );
+      self
+        .ensure_cache_frame2(state, &new_frame)
+        .inspect_err(|_| {
+          self.release_locked_frame2(state);
+        })?;
+      //println!("frame acquired new_frame, info: {:?}", new_frame.timestamp);
+
+      unsafe {
+        self.d3d_ctx.CopyResource(
+          self.state.frame.as_ref().unwrap().as_raw_ref(),
+          new_frame.as_raw_ref(),
+        );
+      }
+    } else {
+      /*println!(
+        "no fresh resource. accumulated {} frames",
+        frame_info.AccumulatedFrames
+      );*/
+    }
+    if self.state.frame.is_none() {
+      return Err(AcquireFrameError::Unknown);
+    }
+    self.release_locked_frame2(state);
+
+    let cache_frame = self.state.frame.clone().unwrap();
+
+    self.ensure_cache_cursor_frame2(state, &cache_frame)?;
+
+    let mut cache_cursor_frame = self.state.cursor_frame.clone().unwrap();
+
+    unsafe {
+      self
+        .d3d_ctx
+        .CopyResource(cache_cursor_frame.as_raw_ref(), cache_frame.as_raw_ref())
+    }
+
+    self.draw_cursor2(state, &cache_cursor_frame)?;
+    cache_cursor_frame.timestamp = frame_info.LastPresentTime as u64;
+    Ok(cache_cursor_frame)
+  }
+
   /// Signals that the current frame is done being processed.
   #[inline]
   fn release_frame(&mut self) -> Result<(), windows::core::Error> {
@@ -313,6 +412,16 @@ impl ScreenDuplicator {
     if self.state.frame_locked {
       let _ = unsafe { self.output_dupl.ReleaseFrame() };
       self.state.frame_locked = false;
+    }
+  }
+  fn release_locked_frame2(&self, state: &mut DuplicationState) {
+    if state.last_resource.is_some() {
+      state.last_resource = None;
+    }
+
+    if state.frame_locked {
+      let _ = unsafe { self.output_dupl.ReleaseFrame() };
+      state.frame_locked = false;
     }
   }
 
@@ -343,6 +452,43 @@ impl ScreenDuplicator {
     }
     Ok(())
   }
+
+  fn ensure_cache_frame2(
+    &self,
+    state: &mut DuplicationState,
+    frame: &Texture,
+  ) -> Result<(), AcquireFrameError> {
+    if state.frame.is_none() {
+      let tex = self.create_texture(
+        frame.desc(),
+        D3D11_USAGE_DEFAULT,
+        D3D11_BIND_RENDER_TARGET,
+        Default::default(),
+        frame.timestamp,
+      )?;
+      state.frame = Some(tex);
+    }
+    Ok(())
+  }
+
+  fn ensure_cache_cursor_frame2(
+    &self,
+    state: &mut DuplicationState,
+    frame: &Texture,
+  ) -> Result<(), AcquireFrameError> {
+    if state.cursor_frame.is_none() {
+      let tex = self.create_texture(
+        frame.desc(),
+        D3D11_USAGE_DEFAULT,
+        D3D11_BIND_RENDER_TARGET,
+        D3D11_RESOURCE_MISC_GDI_COMPATIBLE,
+        frame.timestamp,
+      )?;
+      state.cursor_frame = Some(tex);
+    }
+    Ok(())
+  }
+
   fn _get_cursor_shape(&self, shape: &mut CursorShape) -> Result<(), AcquireFrameError> {
     let last_frame = self.last_frame_info.as_ref().unwrap();
     if shape.buffer.capacity() < last_frame.PointerShapeBufferSize as _ {
@@ -389,6 +535,58 @@ impl ScreenDuplicator {
 
     return Ok(());
   }
+
+  fn _get_cursor_shape2(
+    &self,
+    shape: &mut CursorShape,
+    last_frame_info: &mut Option<DXGI_OUTDUPL_FRAME_INFO>,
+  ) -> Result<(), AcquireFrameError> {
+    let last_frame = last_frame_info.as_ref().unwrap();
+    if shape.buffer.capacity() < last_frame.PointerShapeBufferSize as _ {
+      shape.buffer = Vec::with_capacity(last_frame.PointerShapeBufferSize as _)
+    }
+    let dupl = &self.output_dupl;
+    let mut shape_info: DXGI_OUTDUPL_POINTER_SHAPE_INFO = Default::default();
+    let mut required_size: u32 = 0;
+    let mut result = unsafe {
+      dupl.GetFramePointerShape(
+        last_frame.PointerShapeBufferSize,
+        shape.buffer.as_mut_ptr() as _,
+        &mut required_size,
+        &mut shape_info,
+      )
+    };
+    if matches!(
+      result.clone().map_err(|err| { return err.code() }),
+      Err(DXGI_ERROR_MORE_DATA)
+    ) {
+      shape.buffer = Vec::with_capacity(required_size as _);
+      unsafe {
+        result = dupl.GetFramePointerShape(
+          last_frame.PointerShapeBufferSize,
+          shape.buffer.as_mut_ptr() as _,
+          &mut required_size,
+          &mut shape_info,
+        );
+      }
+    }
+    if result.is_err() {
+      return Err(AcquireFrameError::Unknown);
+    } else {
+      unsafe { shape.buffer.set_len(last_frame.PointerShapeBufferSize as _) };
+      shape.height = shape_info.Height;
+      shape.width = shape_info.Width;
+      shape.pitch = shape_info.Pitch;
+      shape.kind = shape_info.Type.into();
+      shape.hotspot = CursorPos {
+        cx: shape_info.HotSpot.x,
+        cy: shape_info.HotSpot.y,
+      }
+    };
+
+    return Ok(());
+  }
+
   fn create_texture(
     &self,
     tex_desc: TextureDesc,
@@ -464,7 +662,54 @@ impl ScreenDuplicator {
     let _ = unsafe { surface.ReleaseDC(None) };
     Ok(())
   }
+  fn draw_cursor2(
+    &self,
+    state: &mut DuplicationState,
+    tex: &Texture,
+  ) -> Result<(), AcquireFrameError> {
+    //trace!("drawing cursor");
+    let mut cursor_info = CURSORINFO {
+      cbSize: size_of::<CURSORINFO>() as u32,
+      ..Default::default()
+    };
+    let cursor_present = unsafe { GetCursorInfo(&mut cursor_info as *mut CURSORINFO) };
 
+    // if cursor is not present, return raw frame.
+    if (!cursor_present).into() || (cursor_info.flags.0 & CURSOR_SHOWING.0 != CURSOR_SHOWING.0) {
+      //debug!("cursor is absent so not drawing anything");
+      return Ok(());
+    }
+
+    if state.cursor.is_none() || cursor_info.hCursor != *state.cursor.as_ref().unwrap() {
+      state.cursor = Some(cursor_info.hCursor);
+      let point = Self::get_icon_hotspot(cursor_info.hCursor)?;
+      state.hotspot_x = point.x as _;
+      state.hotspot_y = point.y as _;
+    }
+    let surface: IDXGISurface1 = tex.as_raw_ref().cast().unwrap();
+    let hdc = unsafe { surface.GetDC(false) };
+    if let Err(err) = hdc {
+      return Err(AcquireFrameError::Unknown);
+    }
+    let hdc = hdc.unwrap();
+
+    let result = unsafe {
+      DrawIconEx(
+        hdc,
+        cursor_info.ptScreenPos.x - self.state.hotspot_x,
+        cursor_info.ptScreenPos.y - self.state.hotspot_y,
+        self.state.cursor.unwrap(),
+        0,
+        0,
+        0,
+        None,
+        DI_NORMAL,
+      )
+    };
+
+    let _ = unsafe { surface.ReleaseDC(None) };
+    Ok(())
+  }
   fn get_icon_hotspot(cursor: HCURSOR) -> Result<POINT, AcquireFrameError> {
     // get icon information
     let mut icon_info = Default::default();

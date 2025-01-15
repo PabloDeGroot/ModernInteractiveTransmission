@@ -10,19 +10,23 @@ const api = {
       console.log("preload: clearAll");
     });
   },
-  onConnection(func: (id:string) => void) {
+  onConnection(func: any) {
+    console.log("preload: onConnection", func);
     ipcRenderer.on('connection', (_e, id) => {
-      func(id);
+
+      try { func(id) } catch (e) { console.error(e) }
       console.log("preload: connection");
     });
   },
-  onClose(func: (id :string) => void) {
+  onClose(func: (id: string) => void) {
     ipcRenderer.on('close', (_e, id) => {
       func(id);
       console.log("preload: close");
     });
   },
-  onData(id: string, func: (data: any) => void) {
+  onData(id: string, func: any) {
+    console.log("preload: data");
+
     ipcRenderer.on(id, (_e, data) => {
       func(data);
       console.log("preload: data");

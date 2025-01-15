@@ -20,20 +20,22 @@
   let components = $state<Record<string, User | null>>()
   let keys = $state<string[]>([])
 
-  $effect(() => {
-    let api = (window as any).api
-    api.onConnection((id: string) => {
-      components[id] = null
-      keys.push(id)
-      api.onData(id, (data: any) => {
-        if (components[id] == null) return
-        components[id].recieveData(data)
-      })
+  let api = (window as any).api
+  console.log('users')
+
+  api.onConnection((id: string) => {
+    console.log('Connection2', id)
+    components[id] = null
+    keys.push(id)
+    api.onData(id, (data: any) => {
+      console.log('Data', data)
+      if (components[id] == null) return
+      components[id].recieveData(data)
     })
-    api.onClose((id: string) => {
-      components[id] = null
-      keys = keys.filter((key) => key !== id)
-    })
+  })
+  api.onClose((id: string) => {
+    components[id] = null
+    keys = keys.filter((key) => key !== id)
   })
   // Get Monitor Stream
   // Call every user in the room

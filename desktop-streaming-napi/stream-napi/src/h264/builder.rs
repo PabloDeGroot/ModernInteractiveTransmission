@@ -5,6 +5,8 @@ use crate::{
   texture::Texture,
 };
 use std::{collections::HashMap, sync::Arc};
+
+use parking_lot::Mutex;
 use webrtc::{
   rtp_transceiver::{rtp_codec::RTCRtpCodecCapability, RTCRtpTransceiver},
   track::track_local::track_local_static_rtp::TrackLocalStaticRTP,
@@ -29,14 +31,14 @@ use windows::Win32::Graphics::{
 pub struct H264EncoderBuilder {
   device: ID3D11Device,
   context: ID3D11DeviceContext,
+  desc: DXGI_OUTDUPL_DESC,
   id: String,
   stream_id: String,
   display_index: u32,
   display_formats: Vec<DXGI_FORMAT>,
   suported_codecs: Vec<Codec>,
-  dupl_rx: ring_channel::RingReceiver<Texture>,
+  dupl: Arc<Mutex<ScreenDuplicator>>,
 
-  dupl_desc: DXGI_OUTDUPL_DESC,
 }
 
 impl EncoderBuilder for H264EncoderBuilder {
@@ -87,7 +89,7 @@ impl EncoderBuilder for H264EncoderBuilder {
 
     let handle = tokio::runtime::Handle::current();
     let (sender, reciever) = tokio::sync::mpsc::channel::<Vec<u8>>(1);
-
+    
     handle.spawn(start_encoder(
       //screen_duplicator,
       reciever,
@@ -101,9 +103,9 @@ impl EncoderBuilder for H264EncoderBuilder {
       codec_capability.clock_rate,
       self.device,
       self.context,
-      self.dupl_rx,
-      self.dupl_desc.ModeDesc.RefreshRate.Numerator,
-      self.dupl_desc.ModeDesc.RefreshRate.Numerator,
+      self.desc.ModeDesc.RefreshRate.Numerator,
+      self.desc.ModeDesc.RefreshRate.Numerator,
+      self.dupl,
     ));
   }
 }
@@ -112,10 +114,11 @@ impl H264EncoderBuilder {
   pub fn new(
     id: String,
     stream_id: String,
+    dupl: Arc<Mutex<ScreenDuplicator>>,
     device: ID3D11Device,
     context: ID3D11DeviceContext,
-    rx: ring_channel::RingReceiver<Texture>,
-    dupl_desc: DXGI_OUTDUPL_DESC,
+    desc : DXGI_OUTDUPL_DESC,
+
   ) -> H264EncoderBuilder {
     println!("H264EncoderBuilder::new");
     /*let (device, context) = match create_d3d11_device_context() {
@@ -136,6 +139,7 @@ impl H264EncoderBuilder {
     let mut suported_codecs: Vec<Codec> = Vec::new();
     suported_codecs.push(H264Codec::constrained_baseline().into());
     println!("Supported codecs:{:?}", suported_codecs);
+
     H264EncoderBuilder {
       id,
       stream_id,
@@ -144,8 +148,10 @@ impl H264EncoderBuilder {
       suported_codecs,
       device: device,
       context: context,
-      dupl_rx: rx,
-      dupl_desc,
+      //dupl_rx: rx,
+      dupl,
+      desc,
+      
     }
   }
 

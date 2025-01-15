@@ -2445,6 +2445,7 @@ dependencies = [
  "napi-derive",
  "nvenc",
  "openh264",
+ "parking_lot",
  "rand",
  "ring-channel",
  "serde",

@@ -19,11 +19,11 @@ export declare class Configuration {
 }
 export type WebRtc = WebRTC
 export declare class WebRTC {
-  static create(conf: Configuration): Promise<WebRtc>
+  static create(conf: Configuration): WebRtc
   sendMessage(message: string): Promise<void>
   onMessage(callback: (err:null|Error, result: string) => void): void
   onData(callback: (err:null|Error, result: string) => void): void
   onClose(callback: (err:null|Error) => void): void
-  static startCapture(): Promise<ExternalObject<CaptureLoop>>
-  init(captureLoop: ExternalObject<CaptureLoop>): void
+  static startCapture(): Promise<ExternalObject<ScreenDuplicator>>
+  init(captureLoop: ExternalObject<ScreenDuplicator>): void
 }
