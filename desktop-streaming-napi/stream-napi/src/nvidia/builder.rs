@@ -2,6 +2,7 @@ use super::encoder::start_encoder;
 use crate::{
   capture::ScreenDuplicator,
   device::{create_d3d11_device, create_d3d11_device_context},
+  texture::Texture,
 };
 use std::{collections::HashMap, sync::Arc};
 use webrtc::{
@@ -16,21 +17,23 @@ use webrtc_helper::{
 };
 use windows::Win32::Graphics::{
   Direct3D11::{ID3D11Device, ID3D11DeviceContext},
-  Dxgi::Common::{
+  Dxgi::{Common::{
     DXGI_FORMAT, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R10G10B10A2_UNORM,
     DXGI_FORMAT_R8G8B8A8_UNORM,
-  },
+  }, DXGI_OUTDUPL_DESC},
 };
 
 pub struct NvidiaEncoderBuilder {
   inner_builder: nvenc::EncoderBuilder<nvenc::DirectX11Device>,
   device: ID3D11Device,
   context: ID3D11DeviceContext,
+  dupl_rx: ring_channel::RingReceiver<Texture>,
   id: String,
   stream_id: String,
   display_index: u32,
   display_formats: Vec<DXGI_FORMAT>,
   supported_codecs: Vec<Codec>,
+  dupl_desc: DXGI_OUTDUPL_DESC,
 }
 impl NvidiaEncoderBuilder {
   fn get_screen_duplicator(&mut self) -> ScreenDuplicator {
@@ -78,7 +81,7 @@ impl EncoderBuilder for NvidiaEncoderBuilder {
     }
     println!("display_index: {:?}", self.display_index);
     println!("display_formats: {:?}", self.display_formats);
-    let screen_duplicator = self.get_screen_duplicator();
+    //let screen_duplicator = self.get_screen_duplicator();
     let (codec, profile) = {
       match codec_capability.mime_type.as_str() {
         "video/H264" => {
@@ -144,8 +147,8 @@ impl EncoderBuilder for NvidiaEncoderBuilder {
     }
 
     let (width, height, texture_format) = {
-      let display_desc = screen_duplicator.desc();
-      let mode_desc = &display_desc.ModeDesc;
+      //let display_desc: windows::Win32::Graphics::Dxgi::DXGI_OUTDUPL_DESC = screen_duplicator.desc();
+      let mode_desc = self.dupl_desc.ModeDesc;
       (mode_desc.Width, mode_desc.Height, mode_desc.Format)
     };
 
@@ -158,7 +161,7 @@ impl EncoderBuilder for NvidiaEncoderBuilder {
 
     let handle = tokio::runtime::Handle::current();
     handle.spawn(start_encoder(
-      screen_duplicator,
+      //screen_duplicator,
       input,
       output,
       rtp_track,
@@ -168,19 +171,29 @@ impl EncoderBuilder for NvidiaEncoderBuilder {
       payload_type,
       ssrc,
       codec_capability.clock_rate,
+      self.dupl_rx,
+      self.dupl_desc.ModeDesc.RefreshRate.Numerator,
+      self.dupl_desc.ModeDesc.RefreshRate.Numerator,
     ));
   }
 }
 
 impl NvidiaEncoderBuilder {
-  pub fn new(id: String, stream_id: String) -> NvidiaEncoderBuilder {
+  pub fn new(
+    id: String,
+    stream_id: String,
+    device: ID3D11Device,
+    context: ID3D11DeviceContext,
+    rx: ring_channel::RingReceiver<Texture>,
+    dupl_desc: DXGI_OUTDUPL_DESC,
+  ) -> NvidiaEncoderBuilder {
     log::info!("NvidiaEncoderBuilder::new");
-    let (device, context) = match create_d3d11_device_context() {
+    /*let (device, context) = match create_d3d11_device_context() {
       Err(e) => {
         panic!("Unable to create D3D11Device: {e}");
       }
       Ok((device, context)) => (device, context),
-    };
+    };*/
     unsafe {
       println!("device feature level: {:?}", device.GetFeatureLevel());
       println!("device flags: {:?}", device.GetCreationFlags());
@@ -219,6 +232,8 @@ impl NvidiaEncoderBuilder {
       display_index,
       display_formats,
       supported_codecs,
+      dupl_rx: rx,
+      dupl_desc
     }
   }
 

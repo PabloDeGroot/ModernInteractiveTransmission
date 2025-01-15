@@ -1,30 +1,46 @@
 use std::{future::Future, pin::Pin, sync::Arc, thread, time::Duration};
 
 use capture::ScreenDuplicator;
+use futures_util::lock::Mutex;
 use h264::H264EncoderBuilder;
 use napi::{
-  bindgen_prelude::{FromNapiValue, Null},
+  bindgen_prelude::{External, FromNapiValue, Null},
   sys,
-  threadsafe_function::{ErrorStrategy, ThreadSafeCallContext, ThreadsafeFunction, ThreadsafeFunctionCallMode},
+  threadsafe_function::{
+    ErrorStrategy, ThreadSafeCallContext, ThreadsafeFunction, ThreadsafeFunctionCallMode,
+  },
   JsFunction, JsObject,
 };
 use nvidia::NvidiaEncoderBuilder;
+use texture::Texture;
 //use h264::H264EncoderBuilder;
-use tokio::sync::Mutex;
-use webrtc::{data::data_channel::DataChannel, data_channel::RTCDataChannel, ice_transport::ice_server::RTCIceServer};
+
+use webrtc::{
+  data::data_channel::DataChannel, data_channel::RTCDataChannel,
+  ice_transport::ice_server::RTCIceServer,
+};
 use webrtc_helper::{peer::Role, Message, WebRtcBuilder};
-use windows::{core::HRESULT, Win32::{Foundation::ERROR_NOT_READY, Graphics::Dxgi::Common::{
-  DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R10G10B10A2_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM,
-}}};
+use windows::{
+  core::HRESULT,
+  Win32::{
+    Foundation::ERROR_NOT_READY,
+    Graphics::{
+      Direct3D11::{ID3D11Device, ID3D11DeviceContext},
+      Dxgi::{Common::{
+        DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R10G10B10A2_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM,
+      }, DXGI_OUTDUPL_DESC},
+    },
+  },
+};
 
 mod capture;
 mod device;
+mod error;
 mod h264;
 mod nvidia;
 mod signaler;
 mod tex_reader;
 mod texture;
-mod error;
 #[macro_use]
 extern crate napi_derive;
 /*
@@ -33,10 +49,9 @@ pub fn sum(a: i32, b: i32) -> i32 {
   a + b
 } */
 
-
 pub fn data_handler(
   data_channel: Arc<RTCDataChannel>,
-  callback : Option<ThreadsafeFunction<String>>,
+  callback: Option<ThreadsafeFunction<String>>,
 ) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> {
   Box::pin(async move {
     let data_channel = Arc::clone(&data_channel);
@@ -53,16 +68,18 @@ pub fn data_handler(
 
         let raw = Arc::clone(&raw);
         tokio::spawn(async move {
-          let _ = control_loop(raw,callback).await;
+          let _ = control_loop(raw, callback).await;
         });
       })
     }));
   })
 }
-async fn control_loop(data_channel: Arc<DataChannel>, callback : Option<ThreadsafeFunction<String>>) {
+async fn control_loop(
+  data_channel: Arc<DataChannel>,
+  callback: Option<ThreadsafeFunction<String>>,
+) {
   //let device = PointerDevice::new().expect("Failed to create `PointerDevice`");
   let mut buffer = vec![0u8; 1500];
-
 
   while let Ok((n, is_string)) = data_channel.read_data_channel(&mut buffer).await {
     if !is_string {
@@ -71,7 +88,7 @@ async fn control_loop(data_channel: Arc<DataChannel>, callback : Option<Threadsa
     if let Ok(s) = std::str::from_utf8(&buffer[..n]) {
       log::info!("Received: {}", s);
       if let Some(callback) = callback.clone() {
-        callback.call(Ok(s.to_string()),ThreadsafeFunctionCallMode::Blocking);
+        callback.call(Ok(s.to_string()), ThreadsafeFunctionCallMode::Blocking);
       }
     }
   }
@@ -119,6 +136,13 @@ impl FromNapiValue for Configuration {
       ice_servers: ice_servers,
     })
   }
+}
+
+pub struct CaptureLoop {
+  device: ID3D11Device,
+  context: ID3D11DeviceContext,
+  dupl_desc: DXGI_OUTDUPL_DESC,
+  rx: ring_channel::RingReceiver<Texture>,
 }
 
 #[napi(js_name = "WebRTC")]
@@ -194,10 +218,24 @@ impl WebRtc {
       .unwrap();
     self.close_callback = Some(tsfn);
   }
+  #[napi]
+  pub async fn start_capture() -> External<Arc<CaptureLoop>> {
+    let dupl = ScreenDuplicator::create().unwrap();
+    let desc = dupl.desc();
+    let capture_loop = Arc::new(CaptureLoop {
+      device: dupl.d3d11_device.clone(),
+      context: dupl.d3d_ctx.clone(),
+      rx: dupl.rx.clone(),
+      dupl_desc: desc,
+    });
+    let capture = Arc::new(Mutex::new(dupl));
 
+    ScreenDuplicator::start_capture_loop(capture);
+    External::new(capture_loop)
+  }
 
   #[napi]
-  pub fn init(&self) {
+  pub fn init(&self, capture_loop: External<Arc<CaptureLoop>>) {
     let send_callback = self.send_callback.clone();
     let rx = self.rx.clone();
     let ice_servers = self.config.ice_servers.clone();
@@ -210,42 +248,7 @@ impl WebRtc {
         credential_type: webrtc::ice_transport::ice_credential_type::RTCIceCredentialType::Password,
       })
       .collect();
-    /*
-    let device = crate::device::create_d3d11_device().unwrap();
-    let duplicator = ScreenDuplicator::new(
-        device,
-        0,
-        vec![
-            DXGI_FORMAT_B8G8R8A8_UNORM,
-            DXGI_FORMAT_R10G10B10A2_UNORM,
-            DXGI_FORMAT_R8G8B8A8_UNORM,
-        ],
-    )
-    .unwrap();
-    let desc = duplicator.desc();
-    println!("desc: {:?}", desc);
-    */
-
-    /*
-       tokio::spawn(async move {
-         let signaler = signaler::NapiSignaler::new(rx, send_callback.unwrap());
-
-         let mut encoder_builder = WebRtcBuilder::new(signaler, Role::Answerer);
-         encoder_builder
-             .with_encoder(Box::new(NvidiaEncoderBuilder::new(
-                 "display-mirror".to_owned(),
-                 "0".to_owned()
-             )))
-             .with_ice_servers(&ice)
-
-             ;//.with_data_channel_handler(Box::new(controls_handler));
-         let encoder = encoder_builder.build().await.unwrap();
-
-         encoder.is_closed().await;
-         //DUPLICATOR_RUNNING.store(false, Ordering::Release);
-         log::info!("Exited");
-     });
-    */
+    println!("desc: {:?}", capture_loop.dupl_desc);
     let signaler = signaler::NapiSignaler::new(rx, send_callback.unwrap());
     let data_callback = self.data_callback.clone();
     let close_callback = self.close_callback.clone();
@@ -253,20 +256,26 @@ impl WebRtc {
       let data: Option<ThreadsafeFunction<String>> = data_callback.clone();
       let mut encoder_builder = WebRtcBuilder::new(signaler, Role::Answerer);
       encoder_builder
-        .with_encoder(Box::new(H264EncoderBuilder::new(
+        .with_encoder(Box::new(NvidiaEncoderBuilder::new(
           "display-mirror".to_owned(),
           "0".to_owned(),
+          capture_loop.device.clone(),
+          capture_loop.context.clone(),
+          capture_loop.rx.clone(),
+          capture_loop.dupl_desc.clone(),
         )))
-        .with_data_channel_handler(Box::new(move|data_channel|{
+        .with_data_channel_handler(Box::new(move |data_channel| {
           let data_clone = data.clone();
           data_handler(data_channel, data_clone)
-        } ));
+        }));
       //thread::sleep(Duration::from_secs(3));
       //.with_data_channel_handler(Box::new(controls_handler));
       let encoder = encoder_builder.build().await.unwrap();
 
       encoder.is_closed().await;
-      close_callback.unwrap().call(Ok(Null),ThreadsafeFunctionCallMode::Blocking);
+      close_callback
+        .unwrap()
+        .call(Ok(Null), ThreadsafeFunctionCallMode::Blocking);
       //DUPLICATOR_RUNNING.store(false, Ordering::Release);
       log::info!("Exited");
     });

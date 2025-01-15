@@ -13,57 +13,58 @@ import { FirestoreCallChannel } from './signaling/FirestoreCallChannel'
 import { FirestoreSignalingChannel } from './signaling/FirestoreSignalingChannel'
 import { i } from 'vite/dist/node/types.d-aGj9QkWt'
 
+WebRTC.startCapture().then((external) => {
+  let callChannel = new FirestoreCallChannel("room3");
+  callChannel.call("app_test"); // todo:  either this or the hosting one is redundants
+  callChannel.onConnection = (callRef, awnsRef) => {
+    let connectionGuid = callRef.id;
+    ipcMain.emit("connection", connectionGuid);
+    let signaling = new FirestoreSignalingChannel("room3", callRef, awnsRef);
+    WebRTC.create({
+      iceServers: [
+        {
+          urls: [//"stun:stun.cloudflare.com:3478",
+            "turn:turn.cloudflare.com:3478?transport=udp",
+            "turn:turn.cloudflare.com:3478?transport=tcp",
+            "turns:turn.cloudflare.com:5349?transport=tcp"],
+          "username": "REDACTED_TURN_USERNAME",
+          "credential": "REDACTED_TURN_CREDENTIAL"
 
-let callChannel = new FirestoreCallChannel("room3");
-callChannel.call("app_test"); // todo:  either this or the hosting one is redundants
-callChannel.onConnection = (callRef, awnsRef) => {
-  let connectionGuid = callRef.id;
-  ipcMain.emit("connection", connectionGuid);
-  let signaling = new FirestoreSignalingChannel("room3", callRef, awnsRef);
-  WebRTC.create({
-    iceServers: [
-      {
-        urls: [//"stun:stun.cloudflare.com:3478",
-          "turn:turn.cloudflare.com:3478?transport=udp",
-          "turn:turn.cloudflare.com:3478?transport=tcp",
-          "turns:turn.cloudflare.com:5349?transport=tcp"],
-        "username": "REDACTED_TURN_USERNAME",
-        "credential": "REDACTED_TURN_CREDENTIAL"
+        }
+      ]
+    }).then((webrtc) => {
+      ipcMain.emit("connection", "")
+      webrtc.onMessage((err, data) => {
+        let message = JSON.parse(data);
+        //console.log("onMessage", message);
+        //console.log("error", err);
+        signaling.send(message);
 
+      });
+      webrtc.onData((err, data) => {
+        if (err) {
+          console.log("error", err);
+          return;
+        }
+        let message = JSON.parse(data);
+        console.log("onData", message);
+        ipcMain.emit(connectionGuid, message);
+      })
+      webrtc.onClose(() => {
+        console.log("onClose");
+        ipcMain.emit("close", connectionGuid);
+      });
+      webrtc.init(external);
+      console.log("webrtc");
+      signaling.onmessage = (message) => {
+        //console.log("signaling message", message);
+        let data = JSON.stringify(message);
+        webrtc.sendMessage(data);
       }
-    ]
-  }).then((webrtc) => {
-    webrtc.onMessage((err, data) => {
-      let message = JSON.parse(data);
-      //console.log("onMessage", message);
-      //console.log("error", err);
-      signaling.send(message);
-
     });
-    webrtc.onData((err, data) => {
-      if (err) {
-        console.log("error", err);
-        return;
-      }
-      let message = JSON.parse(data);
-      console.log("onData", message);
-      ipcMain.emit(connectionGuid, message);
-    })
-    webrtc.onClose(() => {
-      console.log("onClose");
-      ipcMain.emit("close", connectionGuid);
-    });
-    webrtc.init();
-    console.log("webrtc");
-    signaling.onmessage = (message) => {
-      //console.log("signaling message", message);
-      let data = JSON.stringify(message);
-      webrtc.sendMessage(data);
-    }
-  });
-};
+  };
 
-
+});
 const path = require('path')
 let mainWindow: BrowserWindow | null = null
 let onMainWindow: ((mainWindow: BrowserWindow) => void) | null = null;
