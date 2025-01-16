@@ -44,6 +44,7 @@ mod nvidia;
 mod signaler;
 mod tex_reader;
 mod texture;
+mod audio;
 #[macro_use]
 extern crate napi_derive;
 /*
@@ -269,7 +270,7 @@ impl WebRtc {
       let mut encoder_builder = WebRtcBuilder::new(signaler, Role::Answerer);
 
       encoder_builder
-        .with_encoder(Box::new(NvidiaEncoderBuilder::new(
+        .with_encoder(Box::new(H264EncoderBuilder::new(
           "display-mirror".to_owned(),
           "0".to_owned(),
           capture_loop.clone(),
@@ -291,6 +292,8 @@ impl WebRtc {
         .unwrap()
         .call(Ok(Null), ThreadsafeFunctionCallMode::Blocking);
       //DUPLICATOR_RUNNING.store(false, Ordering::Release);
+
+      // https://learn.microsoft.com/en-us/samples/microsoft/windows-classic-samples/applicationloopbackaudio-sample/
       println!("Exited");
     });
   }

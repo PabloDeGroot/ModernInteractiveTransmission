@@ -73,7 +73,7 @@
         //     });
         // }
     };
-    test.call();
+    //test.call();
     console.log("Room: Peer", test.id);
 
     // FIRESTORE

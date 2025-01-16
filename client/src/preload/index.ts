@@ -1,10 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+//window.addEventListener('DOMContentLoaded', () => {
 
+//})
 // Custom APIs for renderer
 const api = {
-
-  data_callbacks: new Map<string, (data: any) => void>(),
 
 
   onClearAll(func: () => void) {
@@ -22,6 +22,7 @@ const api = {
       func(id);
       //try { func(id) } catch (e) { console.error(e) }
       console.log("preload: connection");
+      //console.log(ipcRenderer.eventNames())
     });
 
   },
@@ -33,10 +34,10 @@ const api = {
   },
   addData(id: string, func: (data: any) => void) {
     console.log("preload: data id:", id);
-    ipcRenderer.on("data", (_e, args) => {
+    ipcRenderer.on(id, (_e, args) => {
       console.log("preload: data", args);
       //if (args.id == id) {
-        func(args.data);
+      func(args);
       //}
 
     });
@@ -53,6 +54,9 @@ const api = {
     this.data_callbacks.set(id, func);*/
   },
 
+  onData2() {
+
+  },
   //ipcMain.on('clickMouse', async (event, arg) => {
   clickMouse(x: number, y: number, type: string) {
     ipcRenderer.send('clickMouse', { x: x, y: y, type: type });
@@ -63,6 +67,7 @@ const api = {
   //ipcMain.on('keyDown', async (event, arg) => {
   keyDown(key: string) {
     ipcRenderer.send('keyDown', { key: key });
+
   },
   //ipcMain.on('keyUp', async (event, arg) => {
   keyUp(key: string) {

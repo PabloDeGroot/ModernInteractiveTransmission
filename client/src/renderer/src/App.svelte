@@ -6,8 +6,10 @@
   import Object from './components/Objects/Object.svelte'
   import ObjectCollection from './components/Objects/ObjectCollection.svelte'
   import Presence from './components/Presence.svelte'
+  import WebSocket from 'isomorphic-ws'
+
   //import User from './components/User.svelte'
-  import Users from './components/Users.svelte'
+  import UsersData from './components/UsersData.svelte'
   let api = (window as any).api
 
   let roomName = $state<string | null>(null)
@@ -21,6 +23,8 @@
     console.log('Clearing Objects')
     objectColection.Clear()
   })
+
+
   /* let callChannel = $derived(roomName != null ? new FirestoreCallChannel(roomName) : null)
   let peer = $derived(
     callChannel != null && userId != null ? new MyPeer(callChannel, userId) : null
@@ -113,6 +117,6 @@
   {/each}
 {/if}
 -->
-<Users {draw} {getObject} {createObject} />
 <Canvas bind:this={canvas} />
 <ObjectCollection bind:this={objectColection} />
+<UsersData {draw} {getObject} {createObject} />

@@ -24,6 +24,8 @@ warp = { version = "0.3.3", features = ["tls"] }
 openh264 = "0.6.0"
 ring-channel = "0.12.0"
 parking_lot = "0.12.3"
+fastwebsockets = "0.10.0"
+wasapi = "0.15.0"
 
 [build-dependencies]
 napi-build = "2.0.1"

@@ -13,6 +13,7 @@
     "typecheck": "npm run typecheck:node && npm run svelte-check",
     "start": "electron-vite preview",
     "dev": "electron-vite dev",
+    "debug": "electron-vite dev --inspect=9222",
     "build": "npm run typecheck && electron-vite build",
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir",
@@ -30,7 +31,8 @@
     "stream-napi": "file:../desktop-streaming-napi/stream-napi",
     "svelte": "^5.5.0",
     "sveltefire": "^0.4.5",
-    "webrtc_rust_client": "file:../rust_modules/webrtc_rust_client"
+    "webrtc_rust_client": "file:../rust_modules/webrtc_rust_client",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^2.0.0",
@@ -39,11 +41,13 @@
     "@iconify/json": "^2.2.281",
     "@sveltejs/vite-plugin-svelte": "^3.1.1",
     "@types/node": "^20.14.8",
+    "@types/ws": "^8.5.13",
     "electron": "^31.0.2",
     "electron-builder": "^24.13.3",
     "electron-vite": "^2.3.0",
     "eslint": "^8.57.0",
     "eslint-plugin-svelte": "^2.41.0",
+    "isomorphic-ws": "^5.0.0",
     "prettier": "^3.3.2",
     "prettier-plugin-svelte": "^3.2.5",
     "svelte-check": "^3.8.2",

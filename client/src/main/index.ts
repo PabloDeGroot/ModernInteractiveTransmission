@@ -13,6 +13,68 @@ import { FirestoreCallChannel } from './signaling/FirestoreCallChannel'
 import { FirestoreSignalingChannel } from './signaling/FirestoreSignalingChannel'
 import { i } from 'vite/dist/node/types.d-aGj9QkWt'
 
+function StartWebRTC(mainWindow: BrowserWindow) {
+  WebRTC.startCapture().then((external) => {
+    let callChannel = new FirestoreCallChannel("room3");
+    callChannel.call("app_test"); // todo:  either this or the hosting one is redundants
+    callChannel.onConnection = (callRef, awnsRef) => {
+      let connectionGuid = callRef.id;
+      let signaling = new FirestoreSignalingChannel("room3", callRef, awnsRef);
+      let webrtc = WebRTC.create({
+        iceServers: [
+          {
+            urls: [//"stun:stun.cloudflare.com:3478",
+              "turn:turn.cloudflare.com:3478?transport=udp",
+              "turn:turn.cloudflare.com:3478?transport=tcp",
+              "turns:turn.cloudflare.com:5349?transport=tcp"],
+            "username": "REDACTED_TURN_USERNAME",
+            "credential": "REDACTED_TURN_CREDENTIAL"
+
+          }
+        ]
+      })
+      console.log("connectionGuid", connectionGuid);
+      mainWindow.webContents.send("connection", connectionGuid);
+      //ipcMain.emit("connection", "")
+      webrtc.onMessage((err, data) => {
+        let message = JSON.parse(data);
+        //console.log("onMessage", message);
+        //console.log("error", err);
+        signaling.send(message);
+
+      });
+      webrtc.onData((err, data) => {
+        if (err) {
+          console.log("error", err);
+          return;
+        }
+        //console.log("onData");
+        let message = JSON.parse(data);
+        //console.log("onData", message);
+        mainWindow.webContents.send(connectionGuid, message);
+        //mainWindow.webContents.send("connection", connectionGuid);
+      })
+      webrtc.onClose(() => {
+        console.log("onClose");
+        mainWindow.webContents.send("close", connectionGuid);
+      });
+      webrtc.init(external);
+      console.log("webrtc");
+      signaling.onmessage = (message) => {
+        //console.log("signaling message", message);
+        let data = JSON.stringify(message);
+        webrtc.sendMessage(data);
+      }
+
+    };
+
+  });
+}
+
+
+
+
+
 const path = require('path')
 let mainWindow: BrowserWindow | null = null
 let onMainWindow: ((mainWindow: BrowserWindow) => void) | null = null;
@@ -26,6 +88,7 @@ function createWindow(): void {
   width = width * screen.getPrimaryDisplay().scaleFactor;
   height = height * screen.getPrimaryDisplay().scaleFactor;
   // Create the browser window.
+  console.log("Creating window")
   const mainWindow = new BrowserWindow({
     show: false,
     transparent: true,
@@ -36,9 +99,10 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: true,
+      contextIsolation: false,
       preload: join(app.getAppPath(), './out/preload/index.js'),
-      sandbox: false
+      sandbox: false,
+
     }
   })
 
@@ -55,70 +119,15 @@ function createWindow(): void {
     mainWindow.show()
   })
 
-  
+
 
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
-  mainWindow.webContents.once("did-finish-load", () => {
-    WebRTC.startCapture().then((external) => {
-      let callChannel = new FirestoreCallChannel("room3");
-      callChannel.call("app_test"); // todo:  either this or the hosting one is redundants
-      callChannel.onConnection = (callRef, awnsRef) => {
-        let connectionGuid = callRef.id;
-        console.log("connectionGuid", connectionGuid);
-        mainWindow.webContents.send("connection", connectionGuid);
-        let signaling = new FirestoreSignalingChannel("room3", callRef, awnsRef);
-        let webrtc = WebRTC.create({
-          iceServers: [
-            {
-              urls: [//"stun:stun.cloudflare.com:3478",
-                "turn:turn.cloudflare.com:3478?transport=udp",
-                "turn:turn.cloudflare.com:3478?transport=tcp",
-                "turns:turn.cloudflare.com:5349?transport=tcp"],
-              "username": "REDACTED_TURN_USERNAME",
-              "credential": "REDACTED_TURN_CREDENTIAL"
 
-            }
-          ]
-        })
-        //ipcMain.emit("connection", "")
-        webrtc.onMessage((err, data) => {
-          let message = JSON.parse(data);
-          //console.log("onMessage", message);
-          //console.log("error", err);
-          signaling.send(message);
 
-        });
-        webrtc.onData((err, data) => {
-          if (err) {
-            console.log("error", err);
-            return;
-          }
-          console.log("onData");
-          //let message = JSON.parse(data);
-          //console.log("onData", message);
-          //mainWindow.webContents.send(connectionGuid, message);
-          //mainWindow.webContents.send("connection", connectionGuid);
-        })
-        webrtc.onClose(() => {
-          console.log("onClose");
-          mainWindow.webContents.send("close", connectionGuid);
-        });
-        webrtc.init(external);
-        console.log("webrtc");
-        signaling.onmessage = (message) => {
-          //console.log("signaling message", message);
-          let data = JSON.stringify(message);
-          webrtc.sendMessage(data);
-        }
-
-      };
-
-    });
-  });
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -141,29 +150,6 @@ app.whenReady().then(() => {
 
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
-  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
-    return;
-    if (!request.audioRequested) {
-      desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
-
-        // Grant access to the first screen found.
-        callback({ video: sources[0], audio: 'loopback' })
-
-      })
-    } else {
-      desktopCapturer.getSources({ types: ['window'] }).then((sources) => {
-        // Grant access to the first screen found.
-        sources = sources.filter(source => source.name.includes("Opera"));
-        sources.forEach(source => console.log(source.name));
-        callback({ video: sources[0], audio: 'loopback' })
-
-      })
-    }
-    // If true, use the system picker if available.
-    // Note: this is currently experimental. If the system picker
-    // is available, it will be used and the media request handler
-    // will not be invoked.
-  })
 
 
 
@@ -171,7 +157,7 @@ app.whenReady().then(() => {
   // and ignore CommandOrControl + R in production.
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
+    //optimizer.watchWindowShortcuts(window)
   })
   onMainWindow = (mainWindow) => {
     console.log("onMainWindow");
@@ -179,8 +165,21 @@ app.whenReady().then(() => {
     globalShortcut.register("CommandOrControl+F1", () => {
       console.log("Clearing All...");
       mainWindow.webContents.send("clearAll");
+
     });
+
+    mainWindow.webContents.on('did-finish-load', () => {
+      console.log("did-finish-load");
+      //mainWindow.webContents.send("connection", "app_test");
+
+      StartWebRTC(mainWindow);
+    });
+
     mainWindow.webContents.openDevTools();
+
+
+
+
 
   }
 
