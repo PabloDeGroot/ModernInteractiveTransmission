@@ -120,28 +120,3 @@ key id, API token and static credential pair. Neither `.env` is tracked.
 
 The room the host joins and the host's user id are hard-coded near the top of
 `client/src/main/index.ts` (`room`, `user`) — parameterizing these is an open task.
-
-## Security
-
-A few things to be aware of before running this anywhere real:
-
-- **`firestore.rules` is still the default open ruleset**, with an expiry date of
-  2024-12-28 that has already passed. Every client request is currently denied; before
-  opening it back up, write rules that scope reads and writes to room members.
-- **The Cloudflare TURN API token still reaches the browser.** It now comes from
-  `VITE_CLOUDFLARE_TURN_API_TOKEN` rather than a hard-coded literal, but Vite inlines `VITE_*`
-  into the client bundle, so the token remains readable by anyone who loads the page. The real
-  fix is to mint short-TTL credentials server-side in a Cloud Function. Until then, scope the
-  token to TURN only.
-- The host **injects arbitrary mouse and keyboard input** on behalf of anyone in the room.
-  There is no per-user permission model — treat room ids as capability tokens and keep them
-  private.
-- The Electron host runs with `nodeIntegration: true` and `contextIsolation: false`, and its
-  renderer is trusted implicitly. Hardening this is worth doing before distributing builds.
-
-## Status
-
-Working prototype, actively hacked on. Expect hard-coded values and commented-out experiments.
-
-Git history was rewritten to purge leaked Cloudflare TURN credentials, so any clone made before
-that point is incompatible — re-clone rather than pulling.
