@@ -1,7 +1,0 @@
-{
-	"/": [],
-	"/[slug]": [
-		"src/routes/[slug]/+layout.ts",
-		"src/routes/[slug]/+layout.ts"
-	]
-}

@@ -12,11 +12,23 @@ import { FirestoreSignalingChannel } from "./FirestoreSignalingChannel";
 //impolite peer
 //polite peer
 
+// TURN credentials come from the environment. NOTE: anything read through
+// `import.meta.env.VITE_*` is inlined into the browser bundle and is therefore
+// PUBLIC. The Cloudflare TURN API token must eventually be moved behind a
+// server endpoint (a Cloud Function) that mints short-TTL credentials; until
+// then, use a token scoped to TURN only.
+const TURN_KEY_ID = import.meta.env.VITE_CLOUDFLARE_TURN_KEY_ID;
+const TURN_API_TOKEN = import.meta.env.VITE_CLOUDFLARE_TURN_API_TOKEN;
 
 const fetchIceServers = async () => {
+    if (!TURN_KEY_ID || !TURN_API_TOKEN) {
+        throw new Error(
+            "Missing VITE_CLOUDFLARE_TURN_KEY_ID / VITE_CLOUDFLARE_TURN_API_TOKEN (see .env.example)"
+        );
+    }
     const myHeaders = new Headers();
     myHeaders.append("Content-Type", "application/json");
-    myHeaders.append("Authorization", "Bearer REDACTED_CLOUDFLARE_TURN_API_TOKEN");
+    myHeaders.append("Authorization", `Bearer ${TURN_API_TOKEN}`);
 
     const raw = JSON.stringify({
         "ttl": 100000000
@@ -27,7 +39,10 @@ const fetchIceServers = async () => {
         headers: myHeaders,
         body: raw
     };
-    const response = await fetch("https://rtc.live.cloudflare.com/v1/turn/keys/REDACTED_TURN_KEY_ID/credentials/generate", requestOptions);
+    const response = await fetch(
+        `https://rtc.live.cloudflare.com/v1/turn/keys/${TURN_KEY_ID}/credentials/generate`,
+        requestOptions
+    );
     return response.json();
 };
 

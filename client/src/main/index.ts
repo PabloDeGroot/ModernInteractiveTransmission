@@ -13,7 +13,13 @@ import { FirestoreCallChannel } from './signaling/FirestoreCallChannel'
 import { FirestoreSignalingChannel } from './signaling/FirestoreSignalingChannel'
 import { i } from 'vite/dist/node/types.d-aGj9QkWt'
 
+// TURN credentials are read from the environment (see .env.example). Never
+// commit them: a static TURN credential lets anyone relay traffic on your account.
 function StartWebRTC(mainWindow: BrowserWindow) {
+  if (!process.env.TURN_USERNAME || !process.env.TURN_CREDENTIAL) {
+    console.warn("TURN_USERNAME / TURN_CREDENTIAL are not set - relay will be unavailable")
+  }
+
   WebRTC.startCapture().then((external) => {
     let callChannel = new FirestoreCallChannel("room3");
     callChannel.call("app_test"); // todo:  either this or the hosting one is redundants
@@ -27,8 +33,8 @@ function StartWebRTC(mainWindow: BrowserWindow) {
               "turn:turn.cloudflare.com:3478?transport=udp",
               "turn:turn.cloudflare.com:3478?transport=tcp",
               "turns:turn.cloudflare.com:5349?transport=tcp"],
-            "username": "REDACTED_TURN_USERNAME",
-            "credential": "REDACTED_TURN_CREDENTIAL"
+            "username": process.env.TURN_USERNAME ?? "",
+            "credential": process.env.TURN_CREDENTIAL ?? ""
 
           }
         ]
